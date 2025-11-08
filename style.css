@@ -1,0 +1,243 @@
+/* ================================
+   Dorf-Handelsmanager – StyleSheet
+   Classic + Performance Focus
+   ================================ */
+
+/* ---------- Root Theme ---------- */
+:root {
+  --bg-dark: #0b121c;
+  --bg-panel: #111b29;
+  --accent: #76baff;
+  --accent-soft: #9ad1ff;
+  --text-main: #eaf6ff;
+  --text-muted: #9cb4cc;
+  --ok: #1fa858;
+  --warn: #c9961a;
+  --bad: #c94d4d;
+  --border-light: rgba(255,255,255,0.08);
+  --border-soft: rgba(255,255,255,0.03);
+  --glass: rgba(255,255,255,0.03);
+  --shadow: 0 6px 24px rgba(0,0,0,0.35);
+  --radius: 12px;
+  --transition: all 0.25s ease;
+  --font: 'Inter', 'Segoe UI', Roboto, Arial, sans-serif;
+}
+
+/* ---------- Base ---------- */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(180deg, #061021 0%, #0b121c 100%);
+  color: var(--text-main);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.4;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4 {
+  font-weight: 600;
+  color: var(--accent);
+  margin: 0 0 6px 0;
+}
+
+small, .small { font-size: 13px; }
+.muted { color: var(--text-muted); }
+.right { margin-left: auto; }
+.row { display: flex; align-items: center; gap: 10px; }
+
+/* ---------- Layout Wrappers ---------- */
+.wrap {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 18px;
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+footer {
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 8px;
+}
+
+/* ---------- Topbar ---------- */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+input[type="text"], input[type="number"], select, textarea {
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-light);
+  background: var(--glass);
+  color: var(--text-main);
+  transition: var(--transition);
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(118,186,255,0.2);
+}
+
+/* ---------- Buttons ---------- */
+button {
+  background: var(--accent);
+  color: #04121e;
+  border: none;
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: var(--transition);
+}
+button:hover {
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---------- Panels & Tables ---------- */
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 14px;
+  padding: 12px;
+}
+
+.vendorHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 6px 4px;
+  border-bottom: 1px dashed var(--border-light);
+  transition: var(--transition);
+}
+.vendorHeader:hover {
+  background: rgba(255,255,255,0.02);
+}
+
+.vendorBody {
+  margin-top: 10px;
+  display: none;
+  animation: fadeIn 0.25s ease;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+  font-size: 14px;
+}
+th, td {
+  padding: 6px 8px;
+  border-bottom: 1px dashed var(--border-soft);
+  text-align: left;
+}
+th {
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.4px;
+}
+
+/* ---------- Logs ---------- */
+.log {
+  max-height: 200px;
+  overflow-y: auto;
+  background: rgba(255,255,255,0.02);
+  border-radius: var(--radius);
+  padding: 8px;
+  font-size: 13px;
+  scrollbar-width: thin;
+}
+.log::-webkit-scrollbar { width: 6px; }
+.log::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 6px; }
+
+/* ---------- Modals ---------- */
+.modal {
+  position: fixed;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2000;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 60px rgba(0,0,0,0.6);
+  padding: 16px;
+  width: 720px;
+  max-width: 96%;
+  animation: pop 0.25s ease;
+}
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1990;
+}
+
+/* ---------- Search Suggestions ---------- */
+.search-suggestions {
+  position: absolute;
+  top: 38px; left: 0;
+  width: 100%;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 2100;
+}
+.search-suggestions div {
+  padding: 6px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.02);
+}
+.search-suggestions div:hover {
+  background: rgba(118,186,255,0.12);
+}
+
+/* ---------- Currency Box ---------- */
+.currencyBox input {
+  width: 60px;
+  display: inline-block;
+  margin-right: 4px;
+  text-align: center;
+}
+
+/* ---------- Animations ---------- */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pop {
+  from { transform: translate(-50%, -45%) scale(0.97); opacity: 0; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  body { font-size: 14px; }
+  .panel { padding: 8px; }
+  table { font-size: 13px; }
+  .modal { width: 94%; padding: 12px; }
+  .topbar { flex-direction: column; align-items: flex-start; }
+}
