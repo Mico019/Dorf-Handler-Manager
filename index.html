@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dorf-Handelsmanager 5.0 — Basis</title>
+  <link rel="stylesheet" href="./styles/main.css" />
+</head>
+<body>
+  <!-- ===================== -->
+  <!--   APP LAYOUT V5       -->
+  <!-- ===================== -->
+
+  <div id="app">
+    <!-- HEADER / NAVIGATION -->
+    <header class="app-header">
+      <h1>Dorf-Handelsmanager 5.0</h1>
+      <nav class="top-nav">
+        <button data-tab="vendors">Händler</button>
+        <button data-tab="products">Produkte</button>
+        <button data-tab="transactions">Transaktionen</button>
+        <button data-tab="tools">Tools</button>
+        <button data-tab="settings">Einstellungen</button>
+      </nav>
+    </header>
+
+    <!-- MAIN AREA WITH TABS -->
+    <main id="tab-container">
+      <section id="tab-vendors" class="tab hidden"></section>
+      <section id="tab-products" class="tab hidden"></section>
+      <section id="tab-transactions" class="tab hidden"></section>
+      <section id="tab-tools" class="tab hidden"></section>
+      <section id="tab-settings" class="tab hidden"></section>
+    </main>
+  </div>
+
+  <!-- ===================== -->
+  <!--   SCRIPT MODULES      -->
+  <!-- ===================== -->
+  <script src="./js/state.js"></script>
+  <script src="./js/utils.js"></script>
+  <script src="./js/vendors.js"></script>
+  <script src="./js/products.js"></script>
+  <script src="./js/transactions.js"></script>
+  <script src="./js/tools.js"></script>
+  <script src="./js/settings.js"></script>
+  <script src="./js/ui.js"></script>
+</body>
+</html>
