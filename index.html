@@ -1,49 +1,1251 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dorf-Handelsmanager 5.0 — Basis</title>
-  <link rel="stylesheet" href="styles/style.css" />
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Dorf-Handelsmanager — Local + Produkt-Details</title>
+<style>
+  :root{--bg:#061021;--panel:#0d1b26;--accent:#7fc6ff;--muted:#9fb2c7}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#041018,#061021);color:#eaf6ff;padding:16px}
+  .wrap{max-width:1150px;margin:0 auto}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  h1{margin:0;color:var(--accent);font-size:20px}
+  .lead{color:var(--muted);margin-top:6px;font-size:13px}
+  .topbar{display:flex;gap:8px;align-items:center;margin:14px 0;flex-wrap:wrap}
+  input, select, textarea{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+  button{background:var(--accent);border:none;padding:8px 12px;border-radius:8px;color:#021427;cursor:pointer}
+  .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--accent)}
+  .panel{background:var(--panel);padding:12px;border-radius:10px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.03)}
+  .vendorHeader{display:flex;align-items:center;gap:10px;cursor:pointer}
+  .vendorBody{margin-top:10px;display:none}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px;border-bottom:1px dashed rgba(255,255,255,0.02);text-align:left;vertical-align:top}
+  .small{font-size:13px;color:var(--muted)}
+  .log{max-height:160px;overflow:auto;padding:8px;background:rgba(255,255,255,0.01);border-radius:8px;font-size:13px}
+  .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2000;width:800px;max-width:95%;background:var(--panel);border-radius:12px;padding:14px;box-shadow:0 20px 60px rgba(0,0,0,.7);display:none}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1990;display:none}
+  .prod-detail{background:rgba(255,255,255,0.02)}
+  .search-suggestions{position:absolute;background:var(--panel);padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);max-height:300px;overflow:auto;z-index:2100}
+  .rarity-common{color:#bfbfbf}.rarity-rare{color:#66c4ff}.rarity-legendary{color:#ffd07a}
+  .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .detail-item{font-size:13px;color:var(--muted);margin-bottom:6px}
+  @media (max-width:900px){.modal{width:92%}}
+</style>
 </head>
 <body>
-  <!-- ===================== -->
-  <!--   APP LAYOUT V5       -->
-  <!-- ===================== -->
-
-  <div id="app">
-    <!-- HEADER / NAVIGATION -->
-    <header class="app-header">
-      <h1>Dorf-Handelsmanager 5.0</h1>
-      <nav class="top-nav">
-        <button data-tab="vendors">Händler</button>
-        <button data-tab="products">Produkte</button>
-        <button data-tab="transactions">Transaktionen</button>
-        <button data-tab="tools">Tools</button>
-        <button data-tab="settings">Einstellungen</button>
-      </nav>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Dorf-Handelsmanager — Local Build (mit Produkt-Details)</h1>
+        <div class="lead">Direkte Produkt-Effekt-Ansicht (Dropdown) in Händler- und Manager-Ansicht · Mehrwährung · Kaufen/Verkaufen · Backup</div>
+      </div>
     </header>
 
-    <!-- MAIN AREA WITH TABS -->
-    <main id="tab-container">
-      <section id="tab-vendors" class="tab hidden"></section>
-      <section id="tab-products" class="tab hidden"></section>
-      <section id="tab-transactions" class="tab hidden"></section>
-      <section id="tab-tools" class="tab hidden"></section>
-      <section id="tab-settings" class="tab hidden"></section>
-    </main>
+    <div class="topbar">
+      <div style="position:relative;min-width:280px">
+        <input id="globalSearch" placeholder="Suche Produkte / Händler..." style="width:280px">
+        <div id="suggestBox" class="search-suggestions" style="display:none"></div>
+      </div>
+
+      <select id="globalProductList" style="min-width:360px"><option value="">— Produkte —</option></select>
+      <button id="btnManager" class="btn-ghost">Manager</button>
+      <button id="weekBtn">Wöchentlich sim.</button>
+      <input id="weekStrength" type="range" min="5" max="60" value="18" title="Volatilität">
+      <button id="resetBtn">Reset Daten</button>
+    </div>
+
+    <div id="vendorsContainer"></div>
+
+    <footer class="small" style="margin-top:12px">Öffne per Doppelklick (file://). Falls etwas nicht funktioniert: F12 → Console → poste erste rote Zeile.</footer>
   </div>
 
-  <!-- ===================== -->
-  <!--   SCRIPT MODULES      -->
-  <!-- ===================== -->
-  <script src="js/state.js"></script>
-  <script src="js/utils.js"></script>
-  <script src="js/vendors.js"></script>
-  <script src="js/products.js"></script>
-  <script src="js/transactions.js"></script>
-  <script src="js/tools.js"></script>
-  <script src="js/settings.js"></script>
-  <script src="js/ui.js"></script>
+  <div id="overlay" class="overlay"></div>
+
+  <!-- Produkt Modal (weiterhin verfügbar) -->
+  <div id="productModal" class="modal" aria-hidden="true">
+    <div style="display:flex;align-items:center">
+      <h3 id="pModalTitle" style="margin:0">Produkt</h3>
+      <div style="margin-left:auto"><button id="pSave">Speichern</button> <button id="pClose">Schließen</button></div>
+    </div>
+    <div style="margin-top:8px">
+      <div class="small muted">ID: <span id="pId"></span> · Händler: <span id="pVendor"></span></div>
+      <div style="margin-top:8px"><label>Name</label><br><input id="pName" style="width:100%"></div>
+      <div style="margin-top:8px"><label>Beschreibung</label><br><textarea id="pDesc" rows="3" style="width:100%"></textarea></div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <div style="flex:1"><label>Effekt</label><br><input id="pEffect" style="width:100%"></div>
+        <div style="width:160px"><label>Rarität</label><br><select id="pRarity"><option>Common</option><option>Rare</option><option>Legendary</option></select></div>
+        <div style="width:120px"><label>Bestand</label><br><input id="pStock" type="number" style="width:100%"></div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <div style="width:300px"><label>Sell (Händler verkauft) B S G P</label><br><input id="pSell" placeholder="z.B. 0 5 0 0" style="width:100%"></div>
+        <div style="width:300px"><label>Buy (Händler kauft) B S G P</label><br><input id="pBuy" placeholder="z.B. 0 1 0 0" style="width:100%"></div>
+      </div>
+      <div style="margin-top:8px"><label>Min. Ruhm (Spieler benötigt)</label><br><input id="pMinFame" type="number" value="0" style="width:120px"></div>
+    </div>
+  </div>
+
+  <!-- Transaction Modal -->
+  <div id="transModal" class="modal" aria-hidden="true">
+    <div style="display:flex;align-items:center">
+      <h3 style="margin:0">Transaktion</h3>
+      <div style="margin-left:auto"><button id="transConfirm">Bestätigen</button> <button id="transCancel">Abbrechen</button></div>
+    </div>
+    <div style="margin-top:10px">
+      <div class="small muted">Produkt: <strong id="tProd"></strong> · Händler: <span id="tVendor"></span></div>
+      <div style="margin-top:8px"><label>Menge (pos=Spieler kauft, neg=Händler kauft)</label><br><input id="tQty" type="number" value="1" style="width:120px"></div>
+      <div style="margin-top:8px"><label>Hat gefeilscht?</label><br><select id="tHaggle"><option value="no">Nein</option><option value="yes">Ja</option></select> <input id="tHagglePerc" type="number" value="0" style="width:80px" disabled> (%)</div>
+      <div style="margin-top:10px"><label>Berechneter Preis</label><div id="tPrice" class="small"></div></div>
+    </div>
+  </div>
+
+  <!-- Manager Modal (erweitert: Produkt-Details auch hier) -->
+  <div id="managerModal" class="modal" aria-hidden="true" style="width:760px">
+    <h3>Manager</h3>
+    <div style="display:flex;gap:12px">
+      <div style="flex:1">
+        <h4>Händler hinzufügen</h4>
+        <input id="mVendorName" placeholder="Name"><br><input id="mVendorDesc" placeholder="Beschreibung"><br><button id="mAddVendor">Hinzufügen</button>
+        <h4 style="margin-top:8px">Händler</h4><div id="mVendorList" style="max-height:180px;overflow:auto"></div>
+      </div>
+      <div style="flex:1">
+        <h4>Produkt hinzufügen</h4>
+        <input id="mProdName" placeholder="Produktname"><br>
+        <select id="mProdVendor"></select><br>
+        <input id="mProdType" placeholder="Typ"><br>
+        <select id="mProdRarity"><option>Common</option><option>Rare</option><option>Legendary</option></select><br>
+        <input id="mProdSell" placeholder="Sell B S G P"><br><input id="mProdBuy" placeholder="Buy B S G P"><br>
+        <input id="mProdStock" type="number" value="1"><br>
+        <input id="mProdDesc" placeholder="Kurzbeschreibung"><br>
+        <input id="mProdEffect" placeholder="Effekt"><br>
+        <button id="mAddProd">Hinzufügen</button>
+        <h4 style="margin-top:8px">Produkte (Details per Dropdown)</h4><div id="mProdList" style="max-height:180px;overflow:auto"></div>
+      </div>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+      <button id="mClose">Schließen</button>
+      <button id="mExport">Backup export</button>
+      <input id="mImportFile" type="file" style="display:none">
+      <button id="mImport">Backup import</button>
+      <button id="mApplySale">Global Sale</button>
+      <input id="mSalePct" type="number" value="10" style="width:80px">
+    </div>
+  </div>
+
+<script>
+(function(){
+  'use strict';
+
+  // ---------- Currency helpers ----------
+  const R_B = 1, R_S = 100*R_B, R_G = 100*R_S, R_P = 100*R_G;
+  const STORAGE_KEY = 'dorf_handels_local_with_details_v1';
+
+  function toBronze(obj){ if(!obj) return 0; return (Number(obj.B)||0)*R_B + (Number(obj.S)||0)*R_S + (Number(obj.G)||0)*R_G + (Number(obj.P)||0)*R_P; }
+  function fromBronze(b){ b = Math.max(0, Math.round(b)); const P=Math.floor(b/R_P); b-=P*R_P; const G=Math.floor(b/R_G); b-=G*R_G; const S=Math.floor(b/R_S); b-=S*R_S; const B=b; return {B,S,G,P}; }
+  function fmt(c){ if(!c) return '0B'; const parts=[]; if(c.P) parts.push(c.P+'P'); if(c.G) parts.push(c.G+'G'); if(c.S) parts.push(c.S+'S'); if(c.B) parts.push(c.B+'B'); return parts.length? parts.join(' ') : '0B'; }
+  function nid(s){ return s.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_-]/g,''); }
+
+
+  // ---------- defaults ----------
+  const defaultVendors = [
+    {id:'baldur', name:'Baldur Eisenfaust', desc:'Meisterschmied', funds:{B:0,S:80,G:12,P:0}},
+    {id:'madlen', name:'Madlen', desc:'Magieladen', funds:{B:0,S:50,G:8,P:0}},
+    {id:'voss', name:'Elda & Nico Voss', desc:'Alchemisten', funds:{B:0,S:70,G:10,P:0}},
+    {id:'trav', name:'Reisender Händler', desc:'Saisonal', funds:{B:0,S:40,G:6,P:0}},
+    {id:'obst', name:'Alter Obsthändler', desc:'Lebensmittel', funds:{B:0,S:15,G:1,P:0}},
+    {id:'tav', name:'Zur müden Mondsichel', desc:'Taverne', funds:{B:0,S:120,G:6,P:0}}
+  ];
+
+  // ---------- defaults ----------
+  const defaultProducts = [
+  {"id":"BW-001","name":"Eisenmesser","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Kleines, schlichtes Messer.","suggested_power":"+1 Schaden","buyPrice":{"B":10,"S":0,"G":0,"P":0},"sellPrice":{"B":60,"S":0,"G":0,"P":0},"stock":10},
+  {"id":"BW-002","name":"Kurzschwert","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Kurzschwert für Nahkampf.","suggested_power":"+1 Schaden","buyPrice":{"B":20,"S":0,"G":0,"P":0},"sellPrice":{"B":90,"S":0,"G":0,"P":0},"stock":8},
+  {"id":"BW-003","name":"Jagddolch","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Leichter Dolch, gut für Schurken.","suggested_power":"+1 Schaden, krit. +1","buyPrice":{"B":15,"S":0,"G":0,"P":0},"sellPrice":{"B":80,"S":0,"G":0,"P":0},"stock":9},
+  {"id":"BW-004","name":"Eisenkeule","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Schwere Keule aus Schmiedeeisen.","suggested_power":"+1 Wucht","buyPrice":{"B":25,"S":0,"G":0,"P":0},"sellPrice":{"B":100,"S":0,"G":0,"P":0},"stock":7},
+  {"id":"BW-005","name":"Holzschild","type":"Schild","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Einfacher Rundschild aus Holz.","suggested_power":"+1 Rüstung","buyPrice":{"B":30,"S":0,"G":0,"P":0},"sellPrice":{"B":110,"S":0,"G":0,"P":0},"stock":12},
+  {"id":"BW-006","name":"Lederhandschuhe","type":"Armschutz","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Einfache Lederhandschuhe.","suggested_power":"+1 Geschick","buyPrice":{"B":12,"S":0,"G":0,"P":0},"sellPrice":{"B":70,"S":0,"G":0,"P":0},"stock":10},
+  {"id":"BW-007","name":"Lederhelm","type":"Helm","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Gepolsterter Lederschutz fürs Haupt.","suggested_power":"+1 Rüstung","buyPrice":{"B":20,"S":0,"G":0,"P":0},"sellPrice":{"B":95,"S":0,"G":0,"P":0},"stock":8},
+  {"id":"BW-008","name":"Lederbrust","type":"Rüstung","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Schutzweste aus gegerbtem Leder.","suggested_power":"+1 Rüstung","buyPrice":{"B":50,"S":0,"G":0,"P":0},"sellPrice":{"B":180,"S":0,"G":0,"P":0},"stock":6},
+  {"id":"BW-009","name":"Stahlspeer (einfach)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Gerader Speer, einfache Spitze.","suggested_power":"+1 Schaden, Reichweite +1","buyPrice":{"B":30,"S":0,"G":0,"P":0},"sellPrice":{"B":120,"S":0,"G":0,"P":0},"stock":7},
+  {"id":"BW-010","name":"Wurfdolch (Set)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Set aus drei Wurfmessern.","suggested_power":"+1 Fernkampf","buyPrice":{"B":40,"S":0,"G":0,"P":0},"sellPrice":{"B":150,"S":0,"G":0,"P":0},"stock":6},
+
+  {"id":"BW-011","name":"Stahlmesser","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Schärfer als Eisenschneide.","suggested_power":"+1 Schaden","buyPrice":{"B":25,"S":0,"G":0,"P":0},"sellPrice":{"B":110,"S":0,"G":0,"P":0},"stock":9},
+  {"id":"BW-012","name":"Bogen (Kurz)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Kurzbogen für die Jagd.","suggested_power":"+1 Fernkampf","buyPrice":{"B":45,"S":0,"G":0,"P":0},"sellPrice":{"B":160,"S":0,"G":0,"P":0},"stock":5},
+  {"id":"BW-013","name":"Schmiedehammer (Nahkampf)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Allzweckhammer, kann auch kämpfen.","suggested_power":"+1 Wucht","buyPrice":{"B":35,"S":0,"G":0,"P":0},"sellPrice":{"B":130,"S":0,"G":0,"P":0},"stock":7},
+  {"id":"BW-014","name":"Rundschild (eisenverstärkt)","type":"Schild","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Holzschild mit Metallrand.","suggested_power":"+2 Rüstung","buyPrice":{"B":60,"S":0,"G":0,"P":0},"sellPrice":{"B":200,"S":0,"G":0,"P":0},"stock":5},
+  {"id":"BW-015","name":"Stiefel (Leder)","type":"Stiefel","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Robuste Lederstiefel.","suggested_power":"+1 Ausdauer","buyPrice":{"B":18,"S":0,"G":0,"P":0},"sellPrice":{"B":90,"S":0,"G":0,"P":0},"stock":10},
+  {"id":"BW-016","name":"Gürtel mit Tasche","type":"Tool","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Gürtel mit kleiner Tasche.","suggested_power":"+1 Inventarplatz","buyPrice":{"B":20,"S":0,"G":0,"P":0},"sellPrice":{"B":80,"S":0,"G":0,"P":0},"stock":12},
+  {"id":"BW-017","name":"Kettenhaube (leer)","type":"Helm","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Kettenhaube - schützt den Hals.","suggested_power":"+1 Rüstung","buyPrice":{"B":30,"S":0,"G":0,"P":0},"sellPrice":{"B":120,"S":0,"G":0,"P":0},"stock":6},
+  {"id":"BW-018","name":"Handaxt","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Kleine Zweihand-Axt für Kampf und Holz.","suggested_power":"+1 Schaden","buyPrice":{"B":35,"S":0,"G":0,"P":0},"sellPrice":{"B":140,"S":0,"G":0,"P":0},"stock":8},
+  {"id":"BW-019","name":"Schildbuckel (klein)","type":"Schild","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Kleiner, robuster Schildbuckel.","suggested_power":"+1 Rüstung","buyPrice":{"B":20,"S":0,"G":0,"P":0},"sellPrice":{"B":85,"S":0,"G":0,"P":0},"stock":11},
+  {"id":"BW-020","name":"Beinschützer (Leder)","type":"Rüstung","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Lederschoner für die Beine.","suggested_power":"+1 Rüstung","buyPrice":{"B":22,"S":0,"G":0,"P":0},"sellPrice":{"B":95,"S":0,"G":0,"P":0},"stock":9},
+
+  {"id":"BW-021","name":"Speer (leicht)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Leichter Speer für Formation.","suggested_power":"+1 Schaden","buyPrice":{"B":28,"S":0,"G":0,"P":0},"sellPrice":{"B":110,"S":0,"G":0,"P":0},"stock":8},
+  {"id":"BW-022","name":"Rundschild (stark)","type":"Schild","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Robustes Rundschild aus Stahlblech.","suggested_power":"+2 Rüstung","buyPrice":{"B":80,"S":0,"G":0,"P":0},"sellPrice":{"B":250,"S":0,"G":0,"P":0},"stock":5},
+  {"id":"BW-023","name":"Langmesser","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Etwas längeres, stabiles Messer.","suggested_power":"+1 Schaden","buyPrice":{"B":30,"S":0,"G":0,"P":0},"sellPrice":{"B":120,"S":0,"G":0,"P":0},"stock":7},
+  {"id":"BW-024","name":"Kettenstiefel","type":"Stiefel","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Kettenüberzug für Füße.","suggested_power":"+1 Rüstung","buyPrice":{"B":40,"S":0,"G":0,"P":0},"sellPrice":{"B":150,"S":0,"G":0,"P":0},"stock":6},
+  {"id":"BW-025","name":"Breitschwert (einfach)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":1,"desc":"Breites Schwert, guter Allrounder.","suggested_power":"+2 Schaden","buyPrice":{"B":60,"S":0,"G":0,"P":0},"sellPrice":{"B":220,"S":0,"G":0,"P":0},"stock":5},
+  {"id":"BW-026","name":"Schulterplatten (Leder)","type":"Rüstung","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Lederne Schulterpolster.","suggested_power":"+1 Rüstung","buyPrice":{"B":18,"S":0,"G":0,"P":0},"sellPrice":{"B":90,"S":0,"G":0,"P":0},"stock":10},
+  {"id":"BW-027","name":"Kampfstab (Holz)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Einfacher Kampfstab aus Hartholz.","suggested_power":"+1 Schaden","buyPrice":{"B":20,"S":0,"G":0,"P":0},"sellPrice":{"B":95,"S":0,"G":0,"P":0},"stock":12},
+  {"id":"BW-028","name":"Feldhelm","type":"Helm","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Robuster Helm für Feldtruppen.","suggested_power":"+1 Rüstung","buyPrice":{"B":35,"S":0,"G":0,"P":0},"sellPrice":{"B":140,"S":0,"G":0,"P":0},"stock":7},
+  {"id":"BW-029","name":"Rundschnalle (Gürtel)","type":"Tool","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Breiter Gürtel mit Schnalle.","suggested_power":"+0 (cosmetic)","buyPrice":{"B":8,"S":0,"G":0,"P":0},"sellPrice":{"B":40,"S":0,"G":0,"P":0},"stock":15},
+  {"id":"BW-030","name":"Kampffäustel","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Kleine Faustwaffe, schnell im Schlag.","suggested_power":"+1 Wucht","buyPrice":{"B":28,"S":0,"G":0,"P":0},"sellPrice":{"B":115,"S":0,"G":0,"P":0},"stock":9},
+
+  {"id":"BW-031","name":"Berittener Speer","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":1,"desc":"Längerer Speer für Reiter.","suggested_power":"+2 Schaden, Reichweite +1","buyPrice":{"B":45,"S":0,"G":0,"P":0},"sellPrice":{"B":170,"S":0,"G":0,"P":0},"stock":5},
+  {"id":"BW-032","name":"Armschienen (Metall)","type":"Armschutz","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Metallene Armschienen.","suggested_power":"+1 Rüstung","buyPrice":{"B":25,"S":0,"G":0,"P":0},"sellPrice":{"B":95,"S":0,"G":0,"P":0},"stock":10},
+  {"id":"BW-033","name":"Rampenkeule","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Breite Keule für Durchbruchsschläge.","suggested_power":"+2 Wucht","buyPrice":{"B":50,"S":0,"G":0,"P":0},"sellPrice":{"B":190,"S":0,"G":0,"P":0},"stock":6},
+  {"id":"BW-034","name":"Kettenweste (leicht)","type":"Rüstung","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Leichte Kettenweste.","suggested_power":"+2 Rüstung","buyPrice":{"B":70,"S":0,"G":0,"P":0},"sellPrice":{"B":240,"S":0,"G":0,"P":0},"stock":4},
+  {"id":"BW-035","name":"Reiterschild (mittel)","type":"Schild","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Mittlerer Schild, gut für Reiter.","suggested_power":"+2 Rüstung","buyPrice":{"B":70,"S":0,"G":0,"P":0},"sellPrice":{"B":240,"S":0,"G":0,"P":0},"stock":4},
+  {"id":"BW-036","name":"Säbel (leicht)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Leichter Säbel für Reiterung.","suggested_power":"+1 Schaden, +1 Initiative","buyPrice":{"B":40,"S":0,"G":0,"P":0},"sellPrice":{"B":150,"S":0,"G":0,"P":0},"stock":8},
+  {"id":"BW-037","name":"Brustplatte (einfach)","type":"Rüstung","vendorId":"baldur","rarity":"Common","minFame":1,"desc":"Einfache Stahlbrustplatte.","suggested_power":"+2 Rüstung","buyPrice":{"B":90,"S":0,"G":0,"P":0},"sellPrice":{"B":320,"S":0,"G":0,"P":0},"stock":4},
+  {"id":"BW-038","name":"Kampfstiefel (verstärkt)","type":"Stiefel","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Stiefel mit Stahlspangen.","suggested_power":"+1 Standfestigkeit","buyPrice":{"B":35,"S":0,"G":0,"P":0},"sellPrice":{"B":140,"S":0,"G":0,"P":0},"stock":7},
+  {"id":"BW-039","name":"Beil (Werfer)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Kleines Werfbeil.","suggested_power":"+1 Fernkampf","buyPrice":{"B":30,"S":0,"G":0,"P":0},"sellPrice":{"B":120,"S":0,"G":0,"P":0},"stock":9},
+  {"id":"BW-040","name":"Nackenschutz (Ketten)","type":"Rüstung","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Zusätzlicher Schutz für Nacken und Schultern.","suggested_power":"+1 Rüstung","buyPrice":{"B":22,"S":0,"G":0,"P":0},"sellPrice":{"B":95,"S":0,"G":0,"P":0},"stock":10},
+
+  {"id":"BW-041","name":"Pikenblatt (lang)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":1,"desc":"Lange Spitze für Formation.","suggested_power":"+2 Schaden, Reichweite +2","buyPrice":{"B":70,"S":0,"G":0,"P":0},"sellPrice":{"B":260,"S":0,"G":0,"P":0},"stock":4},
+  {"id":"BW-042","name":"Rundschild (leicht)","type":"Schild","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Kleiner, handlicher Schild.","suggested_power":"+1 Rüstung","buyPrice":{"B":25,"S":0,"G":0,"P":0},"sellPrice":{"B":100,"S":0,"G":0,"P":0},"stock":12},
+  {"id":"BW-043","name":"Wurfspeer (3 Stk.)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Set aus drei Wurfspeeren.","suggested_power":"+1 Fernkampf","buyPrice":{"B":35,"S":0,"G":0,"P":0},"sellPrice":{"B":140,"S":0,"G":0,"P":0},"stock":8},
+  {"id":"BW-044","name":"Halskette (Schutz)","type":"Accessory","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Einfache Kette mit Schutzamulett.","suggested_power":"+0-1 Defensive","buyPrice":{"B":18,"S":0,"G":0,"P":0},"sellPrice":{"B":80,"S":0,"G":0,"P":0},"stock":10},
+  {"id":"BW-045","name":"Kriegshammer (klein)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":1,"desc":"Zuverlässiger Hammer für Kämpfer.","suggested_power":"+2 Wucht","buyPrice":{"B":60,"S":0,"G":0,"P":0},"sellPrice":{"B":230,"S":0,"G":0,"P":0},"stock":5},
+  {"id":"BW-046","name":"Schulterkappen (Metall)","type":"Rüstung","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Metallene Schulterkappen.","suggested_power":"+1 Rüstung","buyPrice":{"B":28,"S":0,"G":0,"P":0},"sellPrice":{"B":110,"S":0,"G":0,"P":0},"stock":9},
+  {"id":"BW-047","name":"Stahlschienbeinschützer","type":"Rüstung","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Schienbeinschützer aus Stahl.","suggested_power":"+1 Rüstung","buyPrice":{"B":40,"S":0,"G":0,"P":0},"sellPrice":{"B":160,"S":0,"G":0,"P":0},"stock":6},
+  {"id":"BW-048","name":"Breitdolch","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Breiter Dolch, geeignet für Garde.","suggested_power":"+1 Schaden","buyPrice":{"B":30,"S":0,"G":0,"P":0},"sellPrice":{"B":120,"S":0,"G":0,"P":0},"stock":8},
+  {"id":"BW-049","name":"Kampffingerhandschuhe","type":"Armschutz","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Handschuhe, die Faustangriffe stärken.","suggested_power":"+1 Schlagkraft","buyPrice":{"B":16,"S":0,"G":0,"P":0},"sellPrice":{"B":75,"S":0,"G":0,"P":0},"stock":12},
+  {"id":"BW-050","name":"Plattengürtel (einfach)","type":"Tool","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Gürtel mit kleinen Platten zur Verstärkung.","suggested_power":"+1 Rüstung","buyPrice":{"B":30,"S":0,"G":0,"P":0},"sellPrice":{"B":120,"S":0,"G":0,"P":0},"stock":7},
+
+  {"id":"BW-051","name":"Stahllangschwert","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":4,"desc":"Gut ausgewogenes Langschwert aus Stahl.","suggested_power":"+3 Schaden","buyPrice":{"B":0,"S":60,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+  {"id":"BW-052","name":"Runenritzel-Schild","type":"Schild","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Schild mit eingravierten Schutzrunen.","suggested_power":"+3 Rüstung","buyPrice":{"B":0,"S":80,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":2},
+  {"id":"BW-053","name":"Verstärkter Brustpanzer","type":"Rüstung","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Brustpanzer mit Verstärkungen.","suggested_power":"+4 Rüstung","buyPrice":{"B":0,"S":90,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":2},
+  {"id":"BW-054","name":"Feinschneide-Dolch","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":4,"desc":"Sehr scharfer Dolch, präzisionsorientiert.","suggested_power":"+3 Schaden, +1 Krit","buyPrice":{"B":0,"S":55,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+  {"id":"BW-055","name":"Speer der Wache","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Langer Speer, gut für Defensive.","suggested_power":"+3 Schaden, Reichweite +2","buyPrice":{"B":0,"S":70,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":2},
+  {"id":"BW-056","name":"Zierhelm (stahl)","type":"Helm","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Stahlhelm mit sauberer Verarbeitung.","suggested_power":"+2 Rüstung, +1 Wahrnehmung","buyPrice":{"B":0,"S":50,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+  {"id":"BW-057","name":"Kriegsaxt (veredelt)","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":6,"desc":"Axt mit verstärkter Schneide.","suggested_power":"+4 Schaden","buyPrice":{"B":0,"S":85,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":2},
+  {"id":"BW-058","name":"Stiefel des Läufers","type":"Stiefel","vendorId":"baldur","rarity":"Rare","minFame":4,"desc":"Schnellere Schuhe, gut für Scouts.","suggested_power":"+2 Initiative","buyPrice":{"B":0,"S":45,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+  {"id":"BW-059","name":"Armschutz (veredelt)","type":"Armschutz","vendorId":"baldur","rarity":"Rare","minFame":4,"desc":"Armschützer mit Metalllagen.","suggested_power":"+2 Rüstung","buyPrice":{"B":0,"S":40,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":4},
+  {"id":"BW-060","name":"Breitschwert (verstärkt)","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Breitschwert mit gehärteter Klinge.","suggested_power":"+4 Schaden","buyPrice":{"B":0,"S":90,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":2},
+
+  {"id":"BW-061","name":"Ritterlicher Schild","type":"Schild","vendorId":"baldur","rarity":"Rare","minFame":6,"desc":"Großer Schild mit Gravur.","suggested_power":"+4 Rüstung","buyPrice":{"B":0,"S":95,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":2},
+  {"id":"BW-062","name":"Klingenstiefel","type":"Stiefel","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Stiefel mit Stahlkappen.","suggested_power":"+2 Rüstung, +1 Standfestigkeit","buyPrice":{"B":0,"S":60,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+  {"id":"BW-063","name":"Schmiedehammer (veredelt)","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Hammer mit perfekter Balance.","suggested_power":"+3 Wucht","buyPrice":{"B":0,"S":70,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+  {"id":"BW-064","name":"Kettenhemd (verstärkt)","type":"Rüstung","vendorId":"baldur","rarity":"Rare","minFame":6,"desc":"Kettenhemd mit zusätzlichen Platten.","suggested_power":"+3 Rüstung","buyPrice":{"B":0,"S":100,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":2},
+  {"id":"BW-065","name":"Hellebarde (gut)","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":6,"desc":"Hellebarde mit scharfer Spitze.","suggested_power":"+4 Schaden, Reichweite +2","buyPrice":{"B":0,"S":110,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":2},
+  {"id":"BW-066","name":"Visierhelm","type":"Helm","vendorId":"baldur","rarity":"Rare","minFame":6,"desc":"Vollvisier-Helm aus Stahl.","suggested_power":"+3 Rüstung","buyPrice":{"B":0,"S":90,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":2},
+  {"id":"BW-067","name":"Spaltbeil (veredelt)","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Axt mit besonderer Schlagkraft.","suggested_power":"+4 Schaden vs. Rüstung","buyPrice":{"B":0,"S":85,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+  {"id":"BW-068","name":"Panzerhandschuhe","type":"Armschutz","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Dicke Handschuhe, geschützt gegen Klingen.","suggested_power":"+2 Rüstung, +1 Wucht","buyPrice":{"B":0,"S":60,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+  {"id":"BW-069","name":"Kampfgurt (verstärkt)","type":"Tool","vendorId":"baldur","rarity":"Rare","minFame":4,"desc":"Starker Gürtel mit Metallteilen.","suggested_power":"+1 Rüstung, +1 Inventar","buyPrice":{"B":0,"S":50,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":4},
+  {"id":"BW-070","name":"Stichschwert (fein)","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Schmaler Stich für Rüstungsnähte.","suggested_power":"+3 Schaden, +1 Präzision","buyPrice":{"B":0,"S":65,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+
+  {"id":"BW-071","name":"Ritterplatte (teil)","type":"Rüstung","vendorId":"baldur","rarity":"Rare","minFame":6,"desc":"Teilplattenrüstung für Brust oder Rücken.","suggested_power":"+4 Rüstung","buyPrice":{"B":0,"S":120,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":2},
+  {"id":"BW-072","name":"Stahlpike","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":6,"desc":"Lanze mit gehärteter Spitze.","suggested_power":"+4 Schaden, Reichweite +3","buyPrice":{"B":0,"S":130,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":2},
+  {"id":"BW-073","name":"Schulterpanzer (metall)","type":"Rüstung","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Metallene Schulterplatten mit Verzierungen.","suggested_power":"+2 Rüstung, +1 Einschüchterung","buyPrice":{"B":0,"S":75,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+  {"id":"BW-074","name":"Streitkolben (schwer)","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Schwerer Kolben für Durchschlag.","suggested_power":"+5 Wucht","buyPrice":{"B":0,"S":110,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":2},
+  {"id":"BW-075","name":"Turmschild (groß)","type":"Schild","vendorId":"baldur","rarity":"Rare","minFame":6,"desc":"Großer Schild für Formation.","suggested_power":"+5 Rüstung","buyPrice":{"B":0,"S":140,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":1},
+  {"id":"BW-076","name":"Schlagkette (Kleine)","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Kettenwaffe mit schwerem Kopf.","suggested_power":"+4 Wucht","buyPrice":{"B":0,"S":95,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+  {"id":"BW-077","name":"Körperpanzer (veredelt)","type":"Rüstung","vendorId":"baldur","rarity":"Rare","minFame":6,"desc":"Panzer mit besserer Legierung.","suggested_power":"+5 Rüstung","buyPrice":{"B":0,"S":150,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":1},
+  {"id":"BW-078","name":"Kampfspeer (veredelt)","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Verstärkter Speer mit guter Spitze.","suggested_power":"+4 Schaden, Reichweite +2","buyPrice":{"B":0,"S":95,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+  {"id":"BW-079","name":"Kriegshelm (veredelt)","type":"Helm","vendorId":"baldur","rarity":"Rare","minFame":6,"desc":"Helm mit zusätzlichen Schutzrändern.","suggested_power":"+3 Rüstung, +1 Widerstand","buyPrice":{"B":0,"S":110,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":2},
+  {"id":"BW-080","name":"Klingenpanzer (leicht)","type":"Rüstung","vendorId":"baldur","rarity":"Rare","minFame":6,"desc":"Leichter Panzer mit Klingenverstärkung.","suggested_power":"+3 Rüstung, +1 Schaden","buyPrice":{"B":0,"S":120,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":2},
+
+  {"id":"BW-081","name":"Herzschneider","type":"Waffe","vendorId":"baldur","rarity":"Legendary","minFame":12,"desc":"Alte Klinge, geschmiedet von Meistern.","suggested_power":"+8 Schaden","buyPrice":{"B":0,"S":0,"G":0,"P":1},"sellPrice":{"B":0,"S":0,"G":0,"P":1},"stock":1},
+  {"id":"BW-082","name":"Titanpanzer","type":"Rüstung","vendorId":"baldur","rarity":"Legendary","minFame":13,"desc":"Extrem widerstandsfähige Plattenrüstung.","suggested_power":"+10 Rüstung","buyPrice":{"B":0,"S":0,"G":0,"P":1},"sellPrice":{"B":0,"S":0,"G":0,"P":1},"stock":1},
+  {"id":"BW-083","name":"Sturmhammer","type":"Waffe","vendorId":"baldur","rarity":"Legendary","minFame":12,"desc":"Großer Hammer, dessen Schläge wuchtig sind.","suggested_power":"+9 Wucht","buyPrice":{"B":0,"S":0,"G":0,"P":1},"sellPrice":{"B":0,"S":0,"G":0,"P":1},"stock":1},
+  {"id":"BW-084","name":"Aegis-Schild","type":"Schild","vendorId":"baldur","rarity":"Legendary","minFame":13,"desc":"Legendärer Schild mit großer Schutzkraft.","suggested_power":"+10 Rüstung","buyPrice":{"B":0,"S":0,"G":0,"P":1},"sellPrice":{"B":0,"S":0,"G":0,"P":1},"stock":1},
+  {"id":"BW-085","name":"Drachenstich","type":"Waffe","vendorId":"baldur","rarity":"Legendary","minFame":14,"desc":"Waffe aus altem Drachenschmiedestahl.","suggested_power":"+10 Schaden","buyPrice":{"B":0,"S":0,"G":0,"P":1},"sellPrice":{"B":0,"S":0,"G":0,"P":1},"stock":1},
+
+  {"id":"BW-086","name":"Stahldolch (standard)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Gutes Alltagsmesser.","suggested_power":"+1 Schaden","buyPrice":{"B":20,"S":0,"G":0,"P":0},"sellPrice":{"B":90,"S":0,"G":0,"P":0},"stock":10},
+  {"id":"BW-087","name":"Ritterdolch","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Dolch aus feinem Stahl.","suggested_power":"+3 Schaden","buyPrice":{"B":0,"S":60,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+  {"id":"BW-088","name":"Harnischplatte (Schulter)","type":"Rüstung","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Einfache Schulterplatte.","suggested_power":"+1 Rüstung","buyPrice":{"B":25,"S":0,"G":0,"P":0},"sellPrice":{"B":100,"S":0,"G":0,"P":0},"stock":12},
+  {"id":"BW-089","name":"Stichhelm","type":"Helm","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Mittlerer Helm für Kampfeinheiten.","suggested_power":"+1 Rüstung","buyPrice":{"B":28,"S":0,"G":0,"P":0},"sellPrice":{"B":115,"S":0,"G":0,"P":0},"stock":9},
+  {"id":"BW-090","name":"Zweihandschwert (schlicht)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":1,"desc":"Gutes Zweihandschwert für Fußsoldaten.","suggested_power":"+2 Schaden","buyPrice":{"B":80,"S":0,"G":0,"P":0},"sellPrice":{"B":300,"S":0,"G":0,"P":0},"stock":4},
+  {"id":"BW-091","name":"Plattenstiefel","type":"Stiefel","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Stiefel mit kleinen Platten.","suggested_power":"+2 Rüstung","buyPrice":{"B":0,"S":70,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+  {"id":"BW-092","name":"Kranichspitze (Lanze)","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":6,"desc":"Lanze mit schmaler, langer Spitze.","suggested_power":"+4 Schaden, Reichweite +3","buyPrice":{"B":0,"S":120,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":2},
+  {"id":"BW-093","name":"Kampfgürtel (leder)","type":"Tool","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Gürtel mit Halterungen für Waffen.","suggested_power":"+0 (utility)","buyPrice":{"B":12,"S":0,"G":0,"P":0},"sellPrice":{"B":60,"S":0,"G":0,"P":0},"stock":15},
+  {"id":"BW-094","name":"Schlagring (einfache)","type":"Waffe","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Einfacher Schlagring zur Selbstverteidigung.","suggested_power":"+1 Wucht","buyPrice":{"B":10,"S":0,"G":0,"P":0},"sellPrice":{"B":50,"S":0,"G":0,"P":0},"stock":14},
+  {"id":"BW-095","name":"Klingenstiefel (leicht)","type":"Stiefel","vendorId":"baldur","rarity":"Common","minFame":0,"desc":"Leichte Stiefel mit Klingenverstärkung.","suggested_power":"+1 Rüstung","buyPrice":{"B":20,"S":0,"G":0,"P":0},"sellPrice":{"B":90,"S":0,"G":0,"P":0},"stock":11},
+  {"id":"BW-096","name":"Hellerbrust (leicht)","type":"Rüstung","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Gepolsterte Brust mit Metallplatten.","suggested_power":"+3 Rüstung","buyPrice":{"B":0,"S":95,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":2},
+  {"id":"BW-097","name":"Stahlsegen (Dolch)","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":5,"desc":"Kompakter Dolch mit guter Balance.","suggested_power":"+3 Schaden","buyPrice":{"B":0,"S":60,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+  {"id":"BW-098","name":"Breithelm (veredelt)","type":"Helm","vendorId":"baldur","rarity":"Rare","minFame":6,"desc":"Breiter Helm mit Nackenschutz.","suggested_power":"+3 Rüstung","buyPrice":{"B":0,"S":100,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":2},
+  {"id":"BW-099","name":"Garde-Lanze","type":"Waffe","vendorId":"baldur","rarity":"Rare","minFame":6,"desc":"Lanze für Wachen, robust und lang.","suggested_power":"+4 Schaden, Reichweite +2","buyPrice":{"B":0,"S":115,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":2},
+  {"id":"BW-100","name":"Wächterplatte","type":"Rüstung","vendorId":"baldur","rarity":"Legendary","minFame":14,"desc":"Vollplatte, gefertigt für Elitewächter.","suggested_power":"+12 Rüstung","buyPrice":{"B":0,"S":0,"G":0,"P":1},"sellPrice":{"B":0,"S":0,"G":0,"P":1},"stock":1},
+
+  {"id":"AL-001","name":"Heiltinktur (schwach)","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":0,"desc":"Einfacher Heiltrank.","suggested_power":"Heilt 1-2 HP","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":15,"G":0,"P":0},"stock":20},
+  {"id":"AL-002","name":"Kräutersud","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":0,"desc":"Basis für viele Tränke.","suggested_power":"Handwerksmaterial","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":10,"G":0,"P":0},"stock":25},
+  {"id":"AL-003","name":"Alraunenpulver","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Getrocknete Wurzel, stark duftend.","suggested_power":"Material für Stärketränke","buyPrice":{"B":0,"S":7,"G":0,"P":0},"sellPrice":{"B":0,"S":18,"G":0,"P":0},"stock":15},
+  {"id":"AL-004","name":"Bitterkraut-Extrakt","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":0,"desc":"Konzentriert, sehr bitter.","suggested_power":"Material für Heiltränke","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":12,"G":0,"P":0},"stock":20},
+  {"id":"AL-005","name":"Flaschengeistwasser","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Leicht stimulierend.","suggested_power":"+1 Wachsamkeit (kurz)","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":18,"G":0,"P":0},"stock":12},
+  {"id":"AL-006","name":"Mondsamen","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Pflanze, die nachts blüht.","suggested_power":"Material für Manatränke","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":22,"G":0,"P":0},"stock":10},
+  {"id":"AL-007","name":"Manatropfen (schwach)","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Leichter Energiebooster.","suggested_power":"+1 Mana","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":18,"G":0,"P":0},"stock":14},
+  {"id":"AL-008","name":"Traubensalz","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":0,"desc":"Verstärkt Reaktionen.","suggested_power":"Alchemie-Material","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":8,"G":0,"P":0},"stock":30},
+  {"id":"AL-009","name":"Beruhigungsbalsam","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Lindert Stress.","suggested_power":"Beruhigt leichte Zustände","buyPrice":{"B":0,"S":7,"G":0,"P":0},"sellPrice":{"B":0,"S":20,"G":0,"P":0},"stock":10},
+  {"id":"AL-010","name":"Alchimistenseife","type":"Tool","vendorId":"alchemist","rarity":"Common","minFame":0,"desc":"Neutralisiert leichte Gifte.","suggested_power":"+1 Resistenz (einmalig)","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":14,"G":0,"P":0},"stock":15},
+
+  {"id":"AL-011","name":"Echsenblut","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Warme, rote Flüssigkeit.","suggested_power":"Gift-/Feuertränke","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":17,"G":0,"P":0},"stock":12},
+  {"id":"AL-012","name":"Sumpfmoos","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":0,"desc":"Feuchtes Moos aus Sümpfen.","suggested_power":"Material für Regenerationstränke","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":9,"G":0,"P":0},"stock":30},
+  {"id":"AL-013","name":"Heiltinktur (normal)","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Etwas stärker als die schwache Version.","suggested_power":"Heilt 2-4 HP","buyPrice":{"B":0,"S":12,"G":0,"P":0},"sellPrice":{"B":0,"S":30,"G":0,"P":0},"stock":10},
+  {"id":"AL-014","name":"Bitterblatt-Essenz","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Sehr scharf im Geruch.","suggested_power":"Basismaterial","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":14,"G":0,"P":0},"stock":18},
+  {"id":"AL-015","name":"Giftkügelchen (leicht)","type":"Waffe","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Kleine Kugeln mit schwachem Gift.","suggested_power":"+1 Giftschaden","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":22,"G":0,"P":0},"stock":15},
+  {"id":"AL-016","name":"Klarheitselixier","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Schärft die Sinne.","suggested_power":"+1 Wahrnehmung (kurz)","buyPrice":{"B":0,"S":9,"G":0,"P":0},"sellPrice":{"B":0,"S":24,"G":0,"P":0},"stock":8},
+  {"id":"AL-017","name":"Basiliskenstaub (schwach)","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Feiner, kristalliner Staub.","suggested_power":"Material für Versteinerungs-Tränke","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":28,"G":0,"P":0},"stock":10},
+  {"id":"AL-018","name":"Magnet-Essenz","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Leicht metallisch.","suggested_power":"Material für Schutztränke","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":12,"G":0,"P":0},"stock":25},
+  {"id":"AL-019","name":"Lichtstaub","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":0,"desc":"Leuchtet leicht.","suggested_power":"Material für Lichttränke","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":8,"G":0,"P":0},"stock":30},
+  {"id":"AL-020","name":"Blindpulver (schwach)","type":"Waffe","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Pulverbeutel zum Werfen.","suggested_power":"Blendung für 1 Runde","buyPrice":{"B":0,"S":7,"G":0,"P":0},"sellPrice":{"B":0,"S":18,"G":0,"P":0},"stock":12},
+
+  {"id":"AL-021","name":"Sonnentau","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Kleine, gelbe Pflanze.","suggested_power":"Material für Stärketränke","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":17,"G":0,"P":0},"stock":15},
+  {"id":"AL-022","name":"Schlafpuder (leicht)","type":"Waffe","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Leicht schläfrig machendes Pulver.","suggested_power":"Schlafchance leicht","buyPrice":{"B":0,"S":9,"G":0,"P":0},"sellPrice":{"B":0,"S":24,"G":0,"P":0},"stock":10},
+  {"id":"AL-023","name":"Heiltinktur (stark)","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":3,"desc":"Wirksamer als Standard.","suggested_power":"Heilt 4-6 HP","buyPrice":{"B":0,"S":18,"G":0,"P":0},"sellPrice":{"B":0,"S":40,"G":0,"P":0},"stock":8},
+  {"id":"AL-024","name":"Traumsamen","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Beruhigend, leicht halluzinogen.","suggested_power":"Schlaftränke","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":14,"G":0,"P":0},"stock":18},
+  {"id":"AL-025","name":"Stinkblüte","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":0,"desc":"Übelriechende Pflanze.","suggested_power":"Ablenkungstränke","buyPrice":{"B":0,"S":2,"G":0,"P":0},"sellPrice":{"B":0,"S":7,"G":0,"P":0},"stock":30},
+  {"id":"AL-026","name":"Schutzsalbe (schwach)","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Leichter Hautschutz.","suggested_power":"+1 Resistenz","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":26,"G":0,"P":0},"stock":10},
+  {"id":"AL-027","name":"Echsenhaut","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Schuppige Haut.","suggested_power":"Defensivtränke","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":11,"G":0,"P":0},"stock":20},
+  {"id":"AL-028","name":"Feuermotte-Flügel","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Zerbrechliche Flügel.","suggested_power":"Feuertränke","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":20,"G":0,"P":0},"stock":12},
+  {"id":"AL-029","name":"Schmerzlinderer","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Dämpft Schmerzen.","suggested_power":"+1 Resistenz gegen Schmerzen","buyPrice":{"B":0,"S":7,"G":0,"P":0},"sellPrice":{"B":0,"S":18,"G":0,"P":0},"stock":14},
+  {"id":"AL-030","name":"Frostpulver (schwach)","type":"Waffe","vendorId":"alchemist","rarity":"Common","minFame":3,"desc":"Kühlt die Umgebung.","suggested_power":"Verlangsamt Ziel","buyPrice":{"B":0,"S":12,"G":0,"P":0},"sellPrice":{"B":0,"S":30,"G":0,"P":0},"stock":8},
+
+  {"id":"AL-031","name":"Feueröl","type":"Waffe","vendorId":"alchemist","rarity":"Common","minFame":3,"desc":"Brennbares Öl.","suggested_power":"+1 Feuerschaden","buyPrice":{"B":0,"S":14,"G":0,"P":0},"sellPrice":{"B":0,"S":34,"G":0,"P":0},"stock":6},
+  {"id":"AL-032","name":"Manatropfen (normal)","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Wiederherstellende Essenz.","suggested_power":"+2 Mana","buyPrice":{"B":0,"S":12,"G":0,"P":0},"sellPrice":{"B":0,"S":30,"G":0,"P":0},"stock":10},
+  {"id":"AL-033","name":"Traumrauch","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Macht schläfrig.","suggested_power":"Schwacher Schlaf","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":25,"G":0,"P":0},"stock":10},
+  {"id":"AL-034","name":"Spinnenöl","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Klebrig.","suggested_power":"Material für Hafttränke","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":12,"G":0,"P":0},"stock":25},
+  {"id":"AL-035","name":"Goldkraut","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Seltene, heilende Pflanze.","suggested_power":"Starkes Heilmaterial","buyPrice":{"B":0,"S":9,"G":0,"P":0},"sellPrice":{"B":0,"S":25,"G":0,"P":0},"stock":8},
+  {"id":"AL-036","name":"Wolfsblut","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Besonders warm.","suggested_power":"Stärketränke, Wuttränke","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":18,"G":0,"P":0},"stock":12},
+  {"id":"AL-037","name":"Schutzsalbe (mittel)","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":3,"desc":"Mittlerer Hautschutz.","suggested_power":"+2 Resistenz","buyPrice":{"B":0,"S":15,"G":0,"P":0},"sellPrice":{"B":0,"S":40,"G":0,"P":0},"stock":8},
+  {"id":"AL-038","name":"Giftkügelchen (mittel)","type":"Waffe","vendorId":"alchemist","rarity":"Common","minFame":3,"desc":"Giftiges Wurfmaterial.","suggested_power":"+2 Giftschaden","buyPrice":{"B":0,"S":12,"G":0,"P":0},"sellPrice":{"B":0,"S":30,"G":0,"P":0},"stock":10},
+  {"id":"AL-039","name":"Blindpulver (mittel)","type":"Waffe","vendorId":"alchemist","rarity":"Common","minFame":3,"desc":"Effektiver als die schwache Version.","suggested_power":"Blendung für 2 Runden","buyPrice":{"B":0,"S":15,"G":0,"P":0},"sellPrice":{"B":0,"S":38,"G":0,"P":0},"stock":8},
+  {"id":"AL-040","name":"Frostpulver (mittel)","type":"Waffe","vendorId":"alchemist","rarity":"Common","minFame":3,"desc":"Stark kühlend.","suggested_power":"Starke Verlangsamung","buyPrice":{"B":0,"S":16,"G":0,"P":0},"sellPrice":{"B":0,"S":42,"G":0,"P":0},"stock":8},
+
+  {"id":"AL-041","name":"Heiltrank (groß)","type":"Trank","vendorId":"alchemist","rarity":"Rare","minFame":5,"desc":"Hochwertiger Heiltrank.","suggested_power":"Heilt 8-12 HP","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":4},
+  {"id":"AL-042","name":"Manatrank (groß)","type":"Trank","vendorId":"alchemist","rarity":"Rare","minFame":5,"desc":"Stellt viel Energie wieder her.","suggested_power":"+6 Mana","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":4},
+  {"id":"AL-043","name":"Feueröl (stark)","type":"Waffe","vendorId":"alchemist","rarity":"Rare","minFame":5,"desc":"Verbrennungsintensiv.","suggested_power":"+3 Feuerschaden","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":5},
+  {"id":"AL-044","name":"Antidot (stark)","type":"Trank","vendorId":"alchemist","rarity":"Rare","minFame":4,"desc":"Wirkt gegen starke Gifte.","suggested_power":"Neutralisiert Gift","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":6},
+  {"id":"AL-045","name":"Stärkungselixier","type":"Trank","vendorId":"alchemist","rarity":"Rare","minFame":4,"desc":"Stärkt den Körper.","suggested_power":"+2 Stärke (kurz)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":5},
+  {"id":"AL-046","name":"Schutzsalbe (stark)","type":"Trank","vendorId":"alchemist","rarity":"Rare","minFame":5,"desc":"Starker Hautschutz.","suggested_power":"+3 Resistenz","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":4},
+  {"id":"AL-047","name":"Traumrauch (stark)","type":"Trank","vendorId":"alchemist","rarity":"Rare","minFame":6,"desc":"Sehr wirksam.","suggested_power":"Schlaf (mittel)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":4},
+  {"id":"AL-048","name":"Stärkungspulver","type":"Zutat","vendorId":"alchemist","rarity":"Rare","minFame":5,"desc":"Hochkonzentriert.","suggested_power":"Material für starke Stärketränke","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":5},
+  {"id":"AL-049","name":"Wachsamkeitstonikum","type":"Trank","vendorId":"alchemist","rarity":"Rare","minFame":4,"desc":"Hält wach und konzentriert.","suggested_power":"+2 Wahrnehmung","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":5},
+  {"id":"AL-050","name":"Seelenbalsam","type":"Trank","vendorId":"alchemist","rarity":"Rare","minFame":5,"desc":"Beruhigt Geist und Körper.","suggested_power":"Heilt mentale Zustände","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":4},
+
+  {"id":"AL-051","name":"Blitzpulver (leicht)","type":"Waffe","vendorId":"alchemist","rarity":"Rare","minFame":5,"desc":"Elektrisch geladen.","suggested_power":"+2 Blitzschaden","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":3},
+  {"id":"AL-052","name":"Blitzpulver (stark)","type":"Waffe","vendorId":"alchemist","rarity":"Rare","minFame":6,"desc":"Sehr gefährlich.","suggested_power":"+4 Blitzschaden","buyPrice":{"B":0,"S":0,"G":3,"P":0},"sellPrice":{"B":0,"S":0,"G":4,"P":0},"stock":3},
+  {"id":"AL-053","name":"Frostessenz","type":"Trank","vendorId":"alchemist","rarity":"Rare","minFame":5,"desc":"Eiskalte Mixtur.","suggested_power":"Starke Verlangsamung","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":4},
+  {"id":"AL-054","name":"Flammenessenz","type":"Trank","vendorId":"alchemist","rarity":"Rare","minFame":5,"desc":"Intensiv heiß.","suggested_power":"+3 Feuerschaden","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":4},
+  {"id":"AL-055","name":"Reinigungsessenz","type":"Trank","vendorId":"alchemist","rarity":"Rare","minFame":4,"desc":"Löst Zustände auf.","suggested_power":"Entfernt Debuffs","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":5},
+
+  {"id":"AL-056","name":"Elixier der Ruhe","type":"Trank","vendorId":"alchemist","rarity":"Rare","minFame":5,"desc":"Starker Beruhiger.","suggested_power":"Schlaf-Beruhigung","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":5},
+  {"id":"AL-057","name":"Klarheitstrank (stark)","type":"Trank","vendorId":"alchemist","rarity":"Rare","minFame":5,"desc":"Schärft Sinne extrem.","suggested_power":"+3 Wahrnehmung","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":4},
+  {"id":"AL-058","name":"Goldstaub (rein)","type":"Zutat","vendorId":"alchemist","rarity":"Rare","minFame":5,"desc":"Sehr wertvoll.","suggested_power":"Material für alle starken Tränke","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":4},
+  {"id":"AL-059","name":"Wyrmblut","type":"Zutat","vendorId":"alchemist","rarity":"Rare","minFame":6,"desc":"Seltene Zutat.","suggested_power":"Material für sehr starke Tränke","buyPrice":{"B":0,"S":0,"G":3,"P":0},"sellPrice":{"B":0,"S":0,"G":4,"P":0},"stock":3},
+  {"id":"AL-060","name":"Atem des Frosts","type":"Trank","vendorId":"alchemist","rarity":"Rare","minFame":6,"desc":"Eiskalter Odem.","suggested_power":"+4 Frostschaden","buyPrice":{"B":0,"S":0,"G":3,"P":0},"sellPrice":{"B":0,"S":0,"G":4,"P":0},"stock":3},
+
+  {"id":"AL-061","name":"Phönixasche","type":"Zutat","vendorId":"alchemist","rarity":"Legendary","minFame":12,"desc":"Glühender Staub eines mythischen Vogels.","suggested_power":"Extrem starke Feuertränke","buyPrice":{"B":0,"S":0,"G":0,"P":1},"sellPrice":{"B":0,"S":0,"G":0,"P":1},"stock":1},
+  {"id":"AL-062","name":"Essenz des Lebens","type":"Trank","vendorId":"alchemist","rarity":"Legendary","minFame":13,"desc":"Sehr selten.","suggested_power":"Große Heilung","buyPrice":{"B":0,"S":0,"G":0,"P":1},"sellPrice":{"B":0,"S":0,"G":0,"P":1},"stock":1},
+  {"id":"AL-063","name":"Astralnektar","type":"Trank","vendorId":"alchemist","rarity":"Legendary","minFame":14,"desc":"Energie aus anderen Ebenen.","suggested_power":"+10 Mana","buyPrice":{"B":0,"S":0,"G":0,"P":1},"sellPrice":{"B":0,"S":0,"G":0,"P":1},"stock":1},
+
+  {"id":"AL-064","name":"Kräuterwickel (Heil)","type":"Tool","vendorId":"alchemist","rarity":"Common","minFame":0,"desc":"Einfaches Heilmittel.","suggested_power":"Stellt leichte HP wieder her","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":12,"G":0,"P":0},"stock":20},
+  {"id":"AL-065","name":"Kräuterwickel (Gift)","type":"Tool","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Wirkt leicht entgiftend.","suggested_power":"Giftreduktion leicht","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":14,"G":0,"P":0},"stock":18},
+  {"id":"AL-066","name":"Kleines Elixier der Stärke","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Stärkt leicht.","suggested_power":"+1 Stärke","buyPrice":{"B":0,"S":9,"G":0,"P":0},"sellPrice":{"B":0,"S":22,"G":0,"P":0},"stock":12},
+  {"id":"AL-067","name":"Kleines Elixier der Geschicklichkeit","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Erhöht Geschick.","suggested_power":"+1 Geschick","buyPrice":{"B":0,"S":9,"G":0,"P":0},"sellPrice":{"B":0,"S":22,"G":0,"P":0},"stock":12},
+  {"id":"AL-068","name":"Sehgras","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Verbessert Sichttränke.","suggested_power":"Material Wahrnehmung","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":12,"G":0,"P":0},"stock":20},
+  {"id":"AL-069","name":"Schimmerblatt","type":"Zutat","vendorId":"alchemist","rarity":"Common","minFame":0,"desc":"Leuchtet schwach.","suggested_power":"Basismaterial","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":9,"G":0,"P":0},"stock":25},
+  {"id":"AL-070","name":"Morgentau-Essenz","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Leichte Erfrischung.","suggested_power":"+1 Initiative","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":18,"G":0,"P":0},"stock":15},
+
+  {"id":"AL-071","name":"Kleines Fokus-Elixier","type":"Trank","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Fördert Konzentration.","suggested_power":"+1 Intelligenz","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":22,"G":0,"P":0},"stock":12},
+  {"id":"AL-072","name":"Seelenharz","type":"Zutat","vendorId":"alchemist","rarity":"Rare","minFame":6,"desc":"Sehr seltenes Harz.","suggested_power":"Material für mächtige Tränke","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":3},
+  {"id":"AL-073","name":"Waffenöl (rein)","type":"Tool","vendorId":"alchemist","rarity":"Common","minFame":1,"desc":"Verbessert Waffenzustand.","suggested_power":"+1 Schaden für 1 Kampf","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":18,"G":0,"P":0},"stock":15},
+  {"id":"AL-074","name":"Rauchbombe (leicht)","type":"Waffe","vendorId":"alchemist","rarity":"Common","minFame":2,"desc":"Erzeugt Rauchwolke.","suggested_power":"Sichtblock 1 Runde","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":25,"G":0,"P":0},"stock":10},
+  {"id":"AL-075","name":"Rauchbombe (stark)","type":"Waffe","vendorId":"alchemist","rarity":"Rare","minFame":5,"desc":"Dichte Rauchwolke.","suggested_power":"Sichtblock 2-3 Runden","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":5},
+
+
+  {"id":"MD-001","name":"Trank der kleinen Heilung","type":"Consumable","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Kleine Heilung für Wunden.","effect":"Heilt 1W4+1","buyPrice":{"B":0,"S":2,"G":0,"P":0},"sellPrice":{"B":0,"S":6,"G":0,"P":0},"stock":18},
+  {"id":"MD-002","name":"Trank der Klaren Sinne","type":"Consumable","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Klarerer Kopf für kurze Zeit.","effect":"+1 Wahrnehmung (1 Runde)","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":9,"G":0,"P":0},"stock":12},
+  {"id":"MD-003","name":"Federkitt (Bündel)","type":"Component","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Handliche Zauberkomponente.","effect":"Material für einfache Rezepte","buyPrice":{"B":0,"S":1,"G":0,"P":0},"sellPrice":{"B":0,"S":4,"G":0,"P":0},"stock":30},
+  {"id":"MD-004","name":"Leuchtende Rune (klein)","type":"Tool","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Leuchtet kurz, praktisch für Höhlen.","effect":"Erzeugt Licht (30s)","buyPrice":{"B":0,"S":2,"G":0,"P":0},"sellPrice":{"B":0,"S":7,"G":0,"P":0},"stock":20},
+  {"id":"MD-005","name":"Schutzsalbe (klein)","type":"Consumable","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Leichter Schutz gegen Wunden.","effect":"+1 Rüstung für 1 Stunde","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":8,"G":0,"P":0},"stock":16},
+  {"id":"MD-006","name":"Reinigungsphiole","type":"Consumable","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Reinigt kleine Gifte.","effect":"Entfernt schwachen Giftstatus","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":10,"G":0,"P":0},"stock":14},
+  {"id":"MD-007","name":"Fokusfaden","type":"Component","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Hilft bei Runenarbeit.","effect":"+1 Chance auf Erfolg bei einfachen Ritualen","buyPrice":{"B":0,"S":2,"G":0,"P":0},"sellPrice":{"B":0,"S":6,"G":0,"P":0},"stock":22},
+  {"id":"MD-008","name":"Kleiner Unsichtbalsam","type":"Consumable","vendorId":"madlen","rarity":"Common","minFame":1,"desc":"Vorsichtig dosiert unsichtbar machend.","effect":"Leichte Tarnung (30s)","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":12,"G":0,"P":0},"stock":10},
+  {"id":"MD-009","name":"Schwaches Manakonzentrat","type":"Consumable","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Auffrischung für einfache Zauber.","effect":"+1 Mana (einmal)","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":9,"G":0,"P":0},"stock":18},
+  {"id":"MD-010","name":"Kleine Flasche Antidot","type":"Consumable","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Gegen einfache Vergiftungen.","effect":"Neutralisiert schwaches Gift","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":11,"G":0,"P":0},"stock":12},
+
+  {"id":"MD-011","name":"Glasperle des Flüsterns","type":"Wondrous","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Leichte magische Perle.","effect":"+1 Bonus auf Schleichen (kurz)","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":14,"G":0,"P":0},"stock":9},
+  {"id":"MD-012","name":"Kleine Schriftrolle: Licht","type":"Scroll","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Ein einfachen Lichtzauber als Schriftrolle.","effect":"Wirkt Licht (ähnlich Cantrip)","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":16,"G":0,"P":0},"stock":10},
+  {"id":"MD-013","name":"Seelenknoten (klein)","type":"Tool","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Einfacher Knoten zum Schutz kleiner Gegenstände.","effect":"Schützt ein Objekt (24h) vor Verfluchung","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":15,"G":0,"P":0},"stock":15},
+  {"id":"MD-014","name":"Heilpulver (Granulat)","type":"Consumable","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Auf Wunde gestreut, heilt langsam.","effect":"Heilt 1 HP pro Minute (5min)","buyPrice":{"B":0,"S":2,"G":0,"P":0},"sellPrice":{"B":0,"S":6,"G":0,"P":0},"stock":20},
+  {"id":"MD-015","name":"Dämmertrank (mild)","type":"Consumable","vendorId":"madlen","rarity":"Common","minFame":1,"desc":"Beruhigt für einen kurzen Moment.","effect":"+1 Resistenz gegen Furcht (30min)","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":12,"G":0,"P":0},"stock":12},
+  {"id":"MD-016","name":"Wimpernstaub (klein)","type":"Component","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Feines Pulver für Salben.","effect":"Verbessert Salbenwirkung leicht","buyPrice":{"B":0,"S":2,"G":0,"P":0},"sellPrice":{"B":0,"S":7,"G":0,"P":0},"stock":25},
+  {"id":"MD-017","name":"Schildbräu (Trank)","type":"Consumable","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Kurzzeitiger Schutztrank.","effect":"+1 Rüstung für 10 Minuten","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":18,"G":0,"P":0},"stock":14},
+  {"id":"MD-018","name":"Wachs der Erinnerung","type":"Tool","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Lässt kurze Erinnerungen wieder aufflackern.","effect":"Erinnert an ein Ereignis (einmalig)","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":10,"G":0,"P":0},"stock":20},
+  {"id":"MD-019","name":"Glitzernder Kräutersack","type":"Wondrous","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Kleiner Sack, gut für Zutaten.","effect":"+1 Inventarplatz (klein)","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":15,"G":0,"P":0},"stock":18},
+  {"id":"MD-020","name":"Schnellkocher (alchem.)","type":"Tool","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Kleiner Destillierer für Tränke.","effect":"Reduziert Rezeptzeit leicht","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":22,"G":0,"P":0},"stock":10},
+
+  {"id":"MD-021","name":"Trank der kleinen Stärke","type":"Consumable","vendorId":"madlen","rarity":"Common","minFame":1,"desc":"Kurzzeitiger Kraftschub.","effect":"+1 Stärke (5min)","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":18,"G":0,"P":0},"stock":12},
+  {"id":"MD-022","name":"Lippenstift-Ader (kosm.)","type":"Wondrous","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Kosmetikum mit magischem Glanz.","effect":"Geringer Charisma-Boost (rol.)","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":10,"G":0,"P":0},"stock":22},
+  {"id":"MD-023","name":"Seelenfaden (Meter)","type":"Component","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Hilft bei einfachen Gebinden.","effect":"+1 Erfolg bei kleinen Bindungen","buyPrice":{"B":0,"S":2,"G":0,"P":0},"sellPrice":{"B":0,"S":7,"G":0,"P":0},"stock":30},
+  {"id":"MD-024","name":"Kleine Runenlampe","type":"Tool","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Erzeugt ruhiges Licht, geringe Wärme.","effect":"Lichtquelle (60min)","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":15,"G":0,"P":0},"stock":16},
+  {"id":"MD-025","name":"Trank der leichten Heilung","type":"Consumable","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Kleine, zuverlässige Heilung.","effect":"Heilt 1W6","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":22,"G":0,"P":0},"stock":12},
+  {"id":"MD-026","name":"Miniatur-Karte des Windes","type":"Wondrous","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Zeigt Windrichtung für kurze Zeit.","effect":"Zeigt Richtung (10min)","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":12,"G":0,"P":0},"stock":20},
+  {"id":"MD-027","name":"Kleiner Spiegel der Wahrheit","type":"Wondrous","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Reflektiert kurz Lügen (rollenspiel).","effect":"Gibt Hinweis auf Unehrlichkeit","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":17,"G":0,"P":0},"stock":10},
+  {"id":"MD-028","name":"Fläschchen: Ruheduft","type":"Consumable","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Beruhigender Duft für Schlaf.","effect":"Leichte Schlafwirkung (rollenspiel)","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":9,"G":0,"P":0},"stock":18},
+  {"id":"MD-029","name":"Krautpaket: Ausdauer","type":"Component","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Zusammenstellung kräftigender Kräuter.","effect":"+1 Ausdauer (kurz)","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":14,"G":0,"P":0},"stock":20},
+  {"id":"MD-030","name":"Samtbeutel (runenbestickt)","type":"Wondrous","vendorId":"madlen","rarity":"Common","minFame":0,"desc":"Schützt Inhalt vor Kreuzen.","effect":"+1 Schutz gegen Diebstahl (rol.)","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":18,"G":0,"P":0},"stock":12},
+
+  {"id":"MD-031","name":"Sprungpulver (klein)","type":"Consumable","vendorId":"madlen","rarity":"Rare","minFame":4,"desc":"Ermöglicht hohe Sprünge.","effect":"+2 Sprungweite (kurz)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":6},
+  {"id":"MD-032","name":"Schattenfleck-Öl","type":"Consumable","vendorId":"madlen","rarity":"Rare","minFame":4,"desc":"Verbessert Verstecken in Dunkelheit.","effect":"+2 Schleichen (kurz)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":5},
+  {"id":"MD-033","name":"Endlose Tasche (klein)","type":"Bag","vendorId":"madlen","rarity":"Rare","minFame":6,"desc":"Kleine, halb-endlose Tasche.","effect":"+8 Inventarplätze (magisch kompakt)","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":2},
+  {"id":"MD-034","name":"Endlose Tasche (standard)","type":"Bag","vendorId":"madlen","rarity":"Rare","minFame":6,"desc":"Standardversion der endlosen Tasche.","effect":"+16 Inventarplätze","buyPrice":{"B":0,"S":0,"G":3,"P":0},"sellPrice":{"B":0,"S":0,"G":4,"P":0},"stock":1},
+  {"id":"MD-035","name":"Beutel des kleinen Händlers","type":"Bag","vendorId":"madlen","rarity":"Rare","minFame":6,"desc":"Hat einen kleinen, magischen Verkäufer (Bag-Man).","effect":"Beim Entnehmen erscheint kleines Inventarfach (rol.)","buyPrice":{"B":0,"S":0,"G":3,"P":0},"sellPrice":{"B":0,"S":0,"G":4,"P":0},"stock":1},
+  {"id":"MD-036","name":"Runenstab: einfacher","type":"Staff","vendorId":"madlen","rarity":"Rare","minFame":5,"desc":"Gibt Bonus bei einfachen Zaubern.","effect":"+1 Zauberstärke (einmal pro Ruhe)","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":3},
+  {"id":"MD-037","name":"Spiegel der kleinen Täuschung","type":"Wondrous","vendorId":"madlen","rarity":"Rare","minFame":5,"desc":"Erzeugt eine kurze Illusion.","effect":"Erzeugt 1 kleine Illusion (10s)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":4},
+  {"id":"MD-038","name":"Klangstein (Triller)","type":"Tool","vendorId":"madlen","rarity":"Rare","minFame":4,"desc":"Erzeugt klare Töne zur Ablenkung.","effect":"Ablenkung — Gegnerprobe nötig","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":6},
+  {"id":"MD-039","name":"Tasche der leichten Winde","type":"Bag","vendorId":"madlen","rarity":"Rare","minFame":5,"desc":"Beim Entnehmen weht kühler Wind.","effect":"Geringe Ablenkung / Showeffekt","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":2},
+  {"id":"MD-040","name":"Trank des klaren Willens","type":"Consumable","vendorId":"madlen","rarity":"Rare","minFame":5,"desc":"Stärkt mentale Resistenz.","effect":"+2 gegen mentale Effekte (kurz)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":6},
+
+  {"id":"MD-041","name":"Amulett des leichten Schutzes","type":"Amulet","vendorId":"madlen","rarity":"Rare","minFame":6,"desc":"Magisches Amulett für Basis-Schutz.","effect":"+2 Rüstung (passiv)","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":3},
+  {"id":"MD-042","name":"Salbe der Regeneration","type":"Consumable","vendorId":"madlen","rarity":"Rare","minFame":5,"desc":"Regeneriert Wunden über Zeit.","effect":"Heilt 1W4 pro Runde (3 Runden)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":5},
+  {"id":"MD-043","name":"Schriftrolle: Schutzkreis","type":"Scroll","vendorId":"madlen","rarity":"Rare","minFame":6,"desc":"Erschafft kleinen Schutzkreis.","effect":"Schützt Bereich für einige Minuten","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":3},
+  {"id":"MD-044","name":"Ring des kleinen Glücks","type":"Ring","vendorId":"madlen","rarity":"Rare","minFame":5,"desc":"Kleiner Glücksring.","effect":"+1 auf eine Probe pro Tag","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":2},
+  {"id":"MD-045","name":"Verfluchte Münze (Spiel)","type":"Wondrous","vendorId":"madlen","rarity":"Rare","minFame":5,"desc":"Sieht wie Glücksmünze aus, leise Gefahr.","effect":"+2 auf Glück im Spiel — Fluch: Pech in Kämpfen (rollenspiel)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":2,"P":0},"stock":2},
+  {"id":"MD-046","name":"Elixier der schnellen Heilung","type":"Consumable","vendorId":"madlen","rarity":"Rare","minFame":5,"desc":"Schnelle, starke Heilung.","effect":"Heilt 3W6","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":4},
+  {"id":"MD-047","name":"Deck der kleinen Wunder","type":"Wondrous","vendorId":"madlen","rarity":"Rare","minFame":6,"desc":"Karten mit kleinen, zufälligen Effekten.","effect":"Einmal pro Tag: kleiner Effekt (DM entscheidet)","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":1},
+  {"id":"MD-048","name":"Samtband der Stille","type":"Wondrous","vendorId":"madlen","rarity":"Rare","minFame":5,"desc":"Dämpft Geräusche am Träger.","effect":"+3 auf Heimlichkeit (kurz)","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":2},
+  {"id":"MD-049","name":"Kleine Phiole: Albtraumgift","type":"Consumable","vendorId":"madlen","rarity":"Rare","minFame":6,"desc":"Starkes, psychotropes Gebräu.","effect":"Verursacht Panik (Zielprobe)","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":3,"P":0},"stock":3},
+  {"id":"MD-050","name":"Sternenstaub (rein)","type":"Component","vendorId":"madlen","rarity":"Rare","minFame":6,"desc":"Sternenstaub zur Herstellung starker Elixiere.","effect":"Zutat für hohe Qualitätstränke","buyPrice":{"B":0,"S":0,"G":3,"P":0},"sellPrice":{"B":0,"S":0,"G":4,"P":0},"stock":2},
+
+{"id":"TR-001","name":"Reisespeer","type":"Waffe","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Leichter Speer, ideal für Jagd und Verteidigung.","effect":"+1 Schaden gegen Tiere","buyPrice":{"B":40,"S":0,"G":0,"P":0},"sellPrice":{"B":15,"S":0,"G":0,"P":0},"stock":6},
+{"id":"TR-002","name":"Wanderstock (verstärkt)","type":"Waffe","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Metallverstärkter Stock, nützlich auf Feld und Straße.","effect":"+1 Verteidigung","buyPrice":{"B":50,"S":0,"G":0,"P":0},"sellPrice":{"B":20,"S":0,"G":0,"P":0},"stock":8},
+{"id":"TR-003","name":"Wurfdolche (Set)","type":"Waffe","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Drei ausgewogene Dolche im Stoffetui.","effect":"+1 Fernkampf","buyPrice":{"B":80,"S":0,"G":0,"P":0},"sellPrice":{"B":30,"S":0,"G":0,"P":0},"stock":5},
+{"id":"TR-004","name":"Handaxt (leicht)","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Handliche Axt für Holzarbeiten und Notwehr.","effect":"Holzarbeiten +1","buyPrice":{"B":30,"S":2,"G":0,"P":0},"sellPrice":{"B":12,"S":0,"G":0,"P":0},"stock":7},
+{"id":"TR-005","name":"Nomadensäbel (gekürzt)","type":"Waffe","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Exotische Klinge, geschmiedet auf Reisen.","effect":"+2 Schaden","buyPrice":{"B":0,"S":60,"G":1,"P":0},"sellPrice":{"B":0,"S":12,"G":0,"P":0},"stock":2},
+{"id":"TR-006","name":"Kurzbogen (Reisefertig)","type":"Waffe","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Leichter Bogen in kompakter Bauweise.","effect":"+1 Fernkampf","buyPrice":{"B":45,"S":0,"G":0,"P":0},"sellPrice":{"B":18,"S":0,"G":0,"P":0},"stock":6},
+{"id":"TR-007","name":"Seidenspeer-Zier","type":"Kunst","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Praktischer Speer mit seidenem Tuch als Zier.","effect":"Kosmetisch","buyPrice":{"B":12,"S":0,"G":0,"P":0},"sellPrice":{"B":4,"S":0,"G":0,"P":0},"stock":12},
+{"id":"TR-008","name":"Schleuder (handlich)","type":"Waffe","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Handliche Schleuder mit Ledertasche.","effect":"+1 Fernkampf (billig)","buyPrice":{"B":14,"S":0,"G":0,"P":0},"sellPrice":{"B":5,"S":0,"G":0,"P":0},"stock":10},
+{"id":"TR-009","name":"Falkenstählerner Jagdspeer","type":"Waffe","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Gut balancierter Speer, beliebt bei Jägern.","effect":"+3 Schaden gegen wilde Tiere","buyPrice":{"B":0,"S":90,"G":0,"P":0},"sellPrice":{"B":0,"S":25,"G":0,"P":0},"stock":2},
+{"id":"TR-010","name":"Klapplanze (Reisefertig)","type":"Waffe","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Lanze, die sich für Reisen zusammenklappen lässt.","effect":"+2 Schaden, +1 Reichweite","buyPrice":{"B":0,"S":95,"G":0,"P":0},"sellPrice":{"B":0,"S":30,"G":0,"P":0},"stock":1},
+{"id":"TR-011","name":"Leichter Lederriemen","type":"Rüstung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Gürtel mit einfachen Verstärkungen.","effect":"+1 Rüstung (leicht)","buyPrice":{"B":18,"S":0,"G":0,"P":0},"sellPrice":{"B":6,"S":0,"G":0,"P":0},"stock":20},
+{"id":"TR-012","name":"Wanderumhang (wasserdicht)","type":"Kleidung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Schutz gegen Regen und Wind.","effect":"Wetterresistenz leicht","buyPrice":{"B":0,"S":25,"G":0,"P":0},"sellPrice":{"B":0,"S":8,"G":0,"P":0},"stock":10},
+{"id":"TR-013","name":"Fellstiefel (gefüttert)","type":"Stiefel","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Warme Stiefel für kalte Regionen.","effect":"+1 Ausdauer (kalt)","buyPrice":{"B":25,"S":0,"G":0,"P":0},"sellPrice":{"B":10,"S":0,"G":0,"P":0},"stock":12},
+{"id":"TR-014","name":"Reisekappe mit Krempe","type":"Kleidung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Schützt Augen und Gesicht gegen Sonne.","effect":"Blendresistenz","buyPrice":{"B":8,"S":0,"G":0,"P":0},"sellPrice":{"B":3,"S":0,"G":0,"P":0},"stock":18},
+{"id":"TR-015","name":"Leichter Umhängetasche","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Tasche mit mehreren Fächern für Mark und Proviant.","effect":"+2 Inventarplätze (klein)","buyPrice":{"B":20,"S":0,"G":0,"P":0},"sellPrice":{"B":7,"S":0,"G":0,"P":0},"stock":15},
+{"id":"TR-016","name":"Seidenhalstuch (farbig)","type":"Kleidung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Dekoratives Halstuch aus feiner Seide.","effect":"Kosmetisch","buyPrice":{"B":12,"S":0,"G":0,"P":0},"sellPrice":{"B":4,"S":0,"G":0,"P":0},"stock":20},
+{"id":"TR-017","name":"Kleiner Wasserschlauch","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Zusammenrollbarer Trinkbehälter.","effect":"Hält 2 Portionen Wasser","buyPrice":{"B":6,"S":0,"G":0,"P":0},"sellPrice":{"B":2,"S":0,"G":0,"P":0},"stock":30},
+{"id":"TR-018","name":"Trockenproviant-Paket","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Getrocknete Früchte und Hartbrot.","effect":"Stellt kleine Ausdauer wieder her","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":40},
+{"id":"TR-019","name":"Geröstete Nüsse (Beutel)","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Nahrhafter Snack für unterwegs.","effect":"Kleine Regeneration","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":50},
+{"id":"TR-020","name":"Holzkocher (mini)","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleiner Kocher zum schnellen Erwärmen.","effect":"Ermöglicht Kochen unterwegs","buyPrice":{"B":0,"S":14,"G":0,"P":0},"sellPrice":{"B":0,"S":5,"G":0,"P":0},"stock":12},
+{"id":"TR-021","name":"Handgewebter Schlafsack","type":"Bettzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Einfacher Schlafsack, leicht zu transportieren.","effect":"Schlafkomfort +1","buyPrice":{"B":0,"S":18,"G":0,"P":0},"sellPrice":{"B":0,"S":6,"G":0,"P":0},"stock":10},
+{"id":"TR-022","name":"Kleine Laterne (Öl)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Laterne mit Glas, braucht Öl zum Leuchten.","effect":"Erzeugt Licht (60min)","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":15},
+{"id":"TR-023","name":"Ölfläschchen (brennbar)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleines Nachfüllöl für Laternen und Kocher.","effect":"Brennstoff","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":60},
+{"id":"TR-024","name":"Kompass im Holzetui","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Hilft bei der Orientierung auf Reisen.","effect":"Orientierungshilfe","buyPrice":{"B":0,"S":20,"G":0,"P":0},"sellPrice":{"B":0,"S":7,"G":0,"P":0},"stock":8},
+{"id":"TR-025","name":"Becher aus Zinn","type":"Geschirr","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Robuster Zinnbecher, sehr praktisch.","effect":"Trinken möglich","buyPrice":{"B":4,"S":0,"G":0,"P":0},"sellPrice":{"B":1,"S":0,"G":0,"P":0},"stock":40},
+{"id":"TR-026","name":"Kleines Nähset","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Nadeln, Faden und Ersatzknöpfe.","effect":"Reparaturklein","buyPrice":{"B":6,"S":0,"G":0,"P":0},"sellPrice":{"B":2,"S":0,"G":0,"P":0},"stock":30},
+{"id":"TR-027","name":"Wassersegel (zusammenfaltbar)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Leichte Plane, nützlich für Schutz und improvisierte Segel.","effect":"Multifunktional","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":3},
+{"id":"TR-028","name":"Kleines Heilkräuterbündel","type":"Trankbestandteil","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Natürliche Kräuter mit leichter Heilkraft.","effect":"Basis für Heiltränke","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":25},
+{"id":"TR-029","name":"Trockener Ziegenkäse (Laib)","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Haltbarer Käse, gut auf Reisen.","effect":"Sättigung mittel","buyPrice":{"B":0,"S":14,"G":0,"P":0},"sellPrice":{"B":0,"S":4,"G":0,"P":0},"stock":18},
+{"id":"TR-030","name":"Gewürzset (klein)","type":"Luxus","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Pfeffer, Zimt und andere kleine Gewürze.","effect":"Verbessert Essen (rollenspiel)","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":22},
+{"id":"TR-031","name":"Flöte aus Ebenholz","type":"Instrument","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleine Reiseflöte, erzeugt sanfte Töne.","effect":"Unterhaltung (rol.)","buyPrice":{"B":0,"S":12,"G":0,"P":0},"sellPrice":{"B":0,"S":4,"G":0,"P":0},"stock":14},
+{"id":"TR-032","name":"Schnellbrennendes Fackelset","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Ein Bündel Fackeln, schnell entzündbar.","effect":"Erzeugt Licht/Kurzzeitfeuer","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+{"id":"TR-033","name":"Pfefferkuchen (Beutel)","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Süßer, würziger Reise-Snack.","effect":"Kleine Regeneration","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":40},
+{"id":"TR-034","name":"Karte der Handelsrouten (groß)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Ausführliche Karte mit Notizen des Händlers.","effect":"Zeigt Handelsrouten (rol.)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":2},
+{"id":"TR-035","name":"Kleine Spielkarten (Deck)","type":"Spielzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Deck mit verschiedenen traditionellen Motiven.","effect":"Unterhaltung (rol.)","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":25},
+{"id":"TR-036","name":"Gürteltasche mit Fallenwerkzeug","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Werkzeuge für einfache Fallen und Reparaturen.","effect":"Fallenbau +1","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+{"id":"TR-037","name":"Kleines Fernglas (faltbar)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Gerät zur Beobachtung in der Ferne.","effect":"+2 Wahrnehmung (kurz, rol.)","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+{"id":"TR-038","name":"Rationskonserven (Dose)","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Versiegelte, lang haltbare Nahrung.","effect":"Sättigung lang","buyPrice":{"B":0,"S":12,"G":0,"P":0},"sellPrice":{"B":0,"S":4,"G":0,"P":0},"stock":30},
+{"id":"TR-039","name":"Getrocknete Wurst (Strang)","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Würziger, haltbarer Fleischsnack.","effect":"Sättigung mittel","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":28},
+{"id":"TR-040","name":"Wolldecke (dick)","type":"Bettzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Dicke Decke für kalte Nächte.","effect":"Schutz gegen Kälte","buyPrice":{"B":0,"S":20,"G":0,"P":0},"sellPrice":{"B":0,"S":6,"G":0,"P":0},"stock":12},
+{"id":"TR-041","name":"Seidenkissen (klein)","type":"Luxus","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Kleines, weiches Kissen aus feiner Seide.","effect":"Komfort +1 (Luxus)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":3},
+{"id":"TR-042","name":"Wein (kleine Flasche)","type":"Trank","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Günstiger Landwein.","effect":"Entspannt leicht (rol.)","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":24},
+{"id":"TR-043","name":"Starkbier (klein)","type":"Trank","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kräftiges Bier für kühle Abende.","effect":"Kleine Ausdauer-Aufwertung","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":20},
+{"id":"TR-044","name":"Getränkekolben (Keramik)","type":"Geschirr","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Robuster Kolben für Wasser oder Wein.","effect":"Behälter","buyPrice":{"B":6,"S":0,"G":0,"P":0},"sellPrice":{"B":2,"S":0,"G":0,"P":0},"stock":30},
+{"id":"TR-045","name":"Schnaps (klar)","type":"Trank","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Starker Schnaps, schnell wirksam.","effect":"Wärmt und betäubt (rol.)","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":18},
+{"id":"TR-046","name":"Getrocknete Früchte (Bündel)","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Süßer, haltbarer Snack.","effect":"Kleine Regeneration","buyPrice":{"B":0,"S":7,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":35},
+{"id":"TR-047","name":"Zusammenlegbarer Waschbeckenbeutel","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Praktischer Beutel zum Waschen und Sammeln von Wasser.","effect":"Hygiene unterwegs","buyPrice":{"B":6,"S":0,"G":0,"P":0},"sellPrice":{"B":2,"S":0,"G":0,"P":0},"stock":25},
+{"id":"TR-048","name":"Erste-Hilfe-Set (basic)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Verbände, Kräuter, Basismedizin.","effect":"Kleine Heilung (kurz)","buyPrice":{"B":0,"S":14,"G":0,"P":0},"sellPrice":{"B":0,"S":5,"G":0,"P":0},"stock":20},
+{"id":"TR-049","name":"Stimmungsarmband (Holz)","type":"Schmuck","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Einfaches Armband mit Holzperlen.","effect":"Kosmetisch","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+{"id":"TR-050","name":"Grillrost (faltbar)","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleiner Rost für offenes Feuer.","effect":"Ermöglicht Kochen über dem Feuer","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":15},
+{"id":"TR-051","name":"Kleines Notizbüchlein","type":"Papier","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Leeres Heft für Skizzen und Notizen.","effect":"Aufzeichnung (rol.)","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":50},
+{"id":"TR-052","name":"Taschenspiegel (klein)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Runder Handspiegel mit Lederetui.","effect":"Sicht/Signalgebrauch","buyPrice":{"B":6,"S":0,"G":0,"P":0},"sellPrice":{"B":2,"S":0,"G":0,"P":0},"stock":25},
+{"id":"TR-053","name":"Buntglas-Anhänger","type":"Schmuck","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Schöner Anhänger mit buntem Glasstein.","effect":"Kosmetisch / leichter Talisman","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":5},
+{"id":"TR-054","name":"Kleiner Dolch mit Gravur","type":"Waffe","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Dekorativer Dolch, scharf und fein gearbeitet.","effect":"+2 Schaden (elegant)","buyPrice":{"B":0,"S":40,"G":0,"P":0},"sellPrice":{"B":0,"S":10,"G":0,"P":0},"stock":3},
+{"id":"TR-055","name":"Spieluhr (klein)","type":"Wondrous","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Kleine Spieluhr mit beruhigender Melodie.","effect":"Beruhigt kurz (rol.)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+{"id":"TR-056","name":"Räucherwerk (Beutel)","type":"Luxus","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Aromatisches Harz für Zeremonien und Duft.","effect":"Beruhigende Wirkung (rol.)","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":20},
+{"id":"TR-057","name":"Glasperlen-Kette","type":"Schmuck","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Bunte Perlen an einem einfachen Faden.","effect":"Kosmetisch","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+{"id":"TR-058","name":"Holzspielzeug (Pferd)","type":"Spielzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kinderfreundliches Spielzeug aus Holz.","effect":"Unterhaltung (rol.)","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":30},
+{"id":"TR-059","name":"Kräutertee-Mischung","type":"Trank","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Beruhigender Tee aus gesammelten Kräutern.","effect":"Beruhigt, verbessert Schlaf leicht","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":40},
+{"id":"TR-060","name":"Salz & Zucker (Doppelpack)","type":"Lebensmittel","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Grundnahrungsmittel in kleinen Mengen.","effect":"Kochen möglich","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":60},
+{"id":"TR-061","name":"Schöne Federkappe","type":"Kleidung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kappe mit dekorativer Feder.","effect":"Kosmetisch","buyPrice":{"B":8,"S":0,"G":0,"P":0},"sellPrice":{"B":3,"S":0,"G":0,"P":0},"stock":22},
+{"id":"TR-062","name":"Reise-Gamaschen (leicht)","type":"Kleidung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Schützt Hosenbein und Sprunggelenk.","effect":"Schutz vor Schmutz und Dornen","buyPrice":{"B":12,"S":0,"G":0,"P":0},"sellPrice":{"B":4,"S":0,"G":0,"P":0},"stock":18},
+{"id":"TR-063","name":"Taschenlampe (magnetisch)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Kleine Lampe mit Magnetbefestigung (mechanisch).","effect":"Erzeugt Licht (praktisch)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+{"id":"TR-064","name":"Kleines Münztäschchen","type":"Zubehör","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Leichtes Täschchen für Kleingeld.","effect":"Organisiert Kleingeld","buyPrice":{"B":4,"S":0,"G":0,"P":0},"sellPrice":{"B":1,"S":0,"G":0,"P":0},"stock":35},
+{"id":"TR-065","name":"Feuerstein & Stahl (Set)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Zum schnellen Entzünden von Feuer.","effect":"Feuer entfachen","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":50},
+{"id":"TR-066","name":"Kleines Taschenmesser","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Multifunktionsmesser für den Alltag.","effect":"Allzweck","buyPrice":{"B":12,"S":0,"G":0,"P":0},"sellPrice":{"B":5,"S":0,"G":0,"P":0},"stock":40},
+{"id":"TR-067","name":"Rätselwürfel (Holz)","type":"Spielzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Einfache Hirnübung für unterwegs.","effect":"Unterhaltung (mental)","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":26},
+{"id":"TR-068","name":"Wetterfeste Schriftrolle (leer)","type":"Papier","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Wasserabweisende Beschichtung, leere Seite.","effect":"Notizen wetterfest","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":30},
+{"id":"TR-069","name":"Kleiner Amboss (faltbar)","type":"Werkzeug","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Miniamboss für kleine Reparaturen unterwegs.","effect":"Schmiedearbeiten (klein)","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":2},
+{"id":"TR-070","name":"Kleine Angelrute (Reisefähig)","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Teleskopische Angelrute für unterwegs.","effect":"Fischen möglich","buyPrice":{"B":0,"S":18,"G":0,"P":0},"sellPrice":{"B":0,"S":6,"G":0,"P":0},"stock":10},
+{"id":"TR-071","name":"Faltbarer Becher aus Holz","type":"Geschirr","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kompakter Trinkbecher.","effect":"Trinken möglich","buyPrice":{"B":2,"S":0,"G":0,"P":0},"sellPrice":{"B":1,"S":0,"G":0,"P":0},"stock":50},
+{"id":"TR-072","name":"Handletter-Satz (Stifte)","type":"Papier","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Ein Set Bleistifte und Tinte für Notizen.","effect":"Schreiben möglich","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":40},
+{"id":"TR-073","name":"Reiseapotheke (Erweitert)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Erweiterte Heilmittel: Salben und starke Kräuter.","effect":"Verbesserte Heilung (klein)","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":4},
+{"id":"TR-074","name":"Geräucherter Fisch (Strang)","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Haltbar geräucherter Fang des Händlers.","effect":"Sättigung mittel","buyPrice":{"B":0,"S":12,"G":0,"P":0},"sellPrice":{"B":0,"S":4,"G":0,"P":0},"stock":20},
+{"id":"TR-075","name":"Schrottanker (klein)","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleiner Anker für provisorische Befestigung.","effect":"Befestigung","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":15},
+{"id":"TR-076","name":"Miniatur-Sonnenuhr","type":"Instrument","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleine Sonnenuhr als Schmuckstück und Zeitmesser.","effect":"Zeitabschätzung (rol.)","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":20},
+{"id":"TR-077","name":"Feinpolierte Pferdehaarbürste","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Pflegebürste für Reiter und Tiere.","effect":"Tierpflege +1","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":25},
+{"id":"TR-078","name":"Kleines Notsignal-Set","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Signalspiegel, Pfeife und Rauchpulver.","effect":"Signalgebrauch (Notfall)","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+{"id":"TR-079","name":"Honig (Glas)","type":"Lebensmittel","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Glas mit lokalem Honig.","effect":"Süßungsmittel, kleine Heilwirkung","buyPrice":{"B":0,"S":12,"G":0,"P":0},"sellPrice":{"B":0,"S":4,"G":0,"P":0},"stock":22},
+{"id":"TR-080","name":"Kandierter Ingwer (Dose)","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Würziger, haltbarer Snack.","effect":"Kleine Regeneration","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":26},
+{"id":"TR-081","name":"Teerpflaster (Rolle)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Klebstoff / Dichtmaterial für Fässer und Schuhe.","effect":"Reparaturen (provisorisch)","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+{"id":"TR-082","name":"Steingrinder (klein)","type":"Werkzeug","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Kleines Schleifgerät für Klingen und Nadeln.","effect":"Schärfen +1","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+{"id":"TR-083","name":"Geräuschdämpfende Stiefeleinlagen","type":"Kleidung","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Einlagen zur Schalldämmung beim Schleichen.","effect":"+2 Schleichen (kurz, rol.)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":3},
+{"id":"TR-084","name":"Glasflakon mit Duftöl","type":"Luxus","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Kleiner Flakon mit exotischem Duftöl.","effect":"Duft/Verführung (rol.)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":5},
+{"id":"TR-085","name":"Sammelalbum (leer)","type":"Papier","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Album zum Sammeln von Karten, Münzen oder Andenken.","effect":"Organisation (rol.)","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":20},
+{"id":"TR-086","name":"Kleines Lederetui für Messer","type":"Zubehör","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Schützt kleine Klingen unterwegs.","effect":"Sichere Aufbewahrung","buyPrice":{"B":6,"S":0,"G":0,"P":0},"sellPrice":{"B":2,"S":0,"G":0,"P":0},"stock":30},
+{"id":"TR-087","name":"Reiseapfelwein (Flasche)","type":"Trank","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Günstiger Apfelwein vom Händler.","effect":"Leichte Erholung","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":20},
+{"id":"TR-088","name":"Kleine Klangscheibe (Anhänger)","type":"Wondrous","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Anhänger, der bei Erschütterung einen sanften Ton abgibt.","effect":"Signal / Beruhigung","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+{"id":"TR-089","name":"Gewichtetes Wurfseil (20 Fuß)","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Robustes Seil mit Gewicht zum Werfen.","effect":"Klettern / Befestigen","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":25},
+{"id":"TR-090","name":"Knochennadel (Dekor)","type":"Schmuck","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Einfacher Haarschmuck aus bearbeitetem Knochen.","effect":"Kosmetisch","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":30},
+{"id":"TR-091","name":"Kleiner Haken (Eagle)","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Metallhaken zum Befestigen von Ausrüstung.","effect":"Befestigung","buyPrice":{"B":2,"S":0,"G":0,"P":0},"sellPrice":{"B":1,"S":0,"G":0,"P":0},"stock":60},
+{"id":"TR-092","name":"Kleine Laternenpalette (Reserveglas)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Ersatzgläser für Laternen und Öllampen.","effect":"Ersatzteil","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":40},
+{"id":"TR-093","name":"Miniatur-Schleifstein","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleiner Stein zum Schärfen von Messern unterwegs.","effect":"Schärfen (klein)","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":45},
+{"id":"TR-094","name":"Pfeffer- & Salzmühle (klein)","type":"Luxus","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kompakte Mühle für Gewürze.","effect":"Verbessert Mahlgut","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":20},
+{"id":"TR-095","name":"Notfalldecke (Öko)","type":"Bettzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Dünne, wärmehaltende Decke für Notsituationen.","effect":"Wärmeschutz (klein)","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":35},
+{"id":"TR-096","name":"Kleine Truhe (Holz)","type":"Aufbewahrung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Sicherer Kasten für Wertgegenstände unterwegs.","effect":"Aufbewahrung","buyPrice":{"B":0,"S":25,"G":0,"P":0},"sellPrice":{"B":0,"S":8,"G":0,"P":0},"stock":10},
+{"id":"TR-097","name":"Kleiner Dolch (verziert)","type":"Waffe","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Feiner Dolch mit Ziergravur.","effect":"+1 Schaden","buyPrice":{"B":20,"S":0,"G":0,"P":0},"sellPrice":{"B":8,"S":0,"G":0,"P":0},"stock":18},
+{"id":"TR-098","name":"Schmuckkästchen (klein)","type":"Aufbewahrung","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Kleines Kästchen mit Samt ausgelegt.","effect":"Wertgegenstände sicher aufbewahren","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":3},
+{"id":"TR-099","name":"Kräutersäckchen (duftend)","type":"Luxus","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Säckchen gefüllt mit duftenden Kräutern.","effect":"Beruhigender Duft","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+{"id":"TR-100","name":"Feines Taschentuch (seide)","type":"Kleidung","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Seidiges Taschentuch, weich und hübsch.","effect":"Kosmetisch","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":6},
+{"id":"TR-101","name":"Glitzerpulver (Mini)","type":"Kuriosität","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Schimmerndes Pulver für Dekorationen.","effect":"Kosmetisch (glitzern)","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":35},
+{"id":"TR-102","name":"Kleiner Spiegelanhänger","type":"Schmuck","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Anhänger mit kleinem Spiegel.","effect":"Kosmetisch / Signal","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+{"id":"TR-103","name":"Wimpel (Handgemacht)","type":"Dekoration","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleiner Wimpel mit regionalen Symbolen.","effect":"Dekorativ","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":40},
+{"id":"TR-104","name":"Reisekamm (Knochen)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kamm aus poliertem Knochen.","effect":"Pflege","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":45},
+{"id":"TR-105","name":"Pfeffermischung (exotisch)","type":"Gewürz","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Scharfe Mischung aus fernen Landen.","effect":"Verbessert Geschmack (rol.)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":5},
+{"id":"TR-106","name":"Messingspiegel (klein)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Handlicher Spiegel, robust verarbeitet.","effect":"Signal/Beobachtung","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":28},
+{"id":"TR-107","name":"Kleine Zeltunterlage (Teppich)","type":"Camping","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Leichte Matte für Zeltboden.","effect":"Komfort unter Zelt","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":4,"G":0,"P":0},"stock":18},
+{"id":"TR-108","name":"Reisehandtuch (raschelnd)","type":"Kleidung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Schnell trocknendes Handtuch.","effect":"Hygiene praktisch","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+{"id":"TR-109","name":"Holzkelle (groß)","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Praktische Kelle zum Kochen über offenem Feuer.","effect":"Kochen erleichtert","buyPrice":{"B":2,"S":0,"G":0,"P":0},"sellPrice":{"B":1,"S":0,"G":0,"P":0},"stock":40},
+{"id":"TR-110","name":"Seidengürtel mit Muster","type":"Kleidung","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Feiner Gürtel aus bunter Seide.","effect":"Kosmetisch","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":6},
+{"id":"TR-111","name":"Kleines Kräuterkissen","type":"Luxus","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Duftkissen zur Entspannung.","effect":"Beruhigend (rollenspiel)","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":28},
+{"id":"TR-112","name":"Bogenwachs (Dose)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Pflegt Sehnen und Holz von Bögen.","effect":"Pflege für Bögen","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+{"id":"TR-113","name":"Wolfsledersporen","type":"Zubehör","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Robuste Sporen für Reiterstiefel.","effect":"Reiten +1 (praktisch)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+{"id":"TR-114","name":"Reise-Haumesser (faltbar)","type":"Waffe","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleines Messer, das in den Griff klappt.","effect":"Allzweckmesser","buyPrice":{"B":20,"S":0,"G":0,"P":0},"sellPrice":{"B":8,"S":0,"G":0,"P":0},"stock":35},
+{"id":"TR-115","name":"Seidene Augenbinde","type":"Kleidung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Weiche Augenbinde zum Schlafen.","effect":"Schlafkomfort","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+{"id":"TR-116","name":"Aluminium-Klappsäge (klein)","type":"Werkzeug","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Leichte Säge für kleine Arbeiten unterwegs.","effect":"Holzbearbeitung +1","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":5},
+{"id":"TR-117","name":"Kleines Notfallrudel (Schnur, Nadeln)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Grundausstattung für Reparaturen unterwegs.","effect":"Reparaturhilfe","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":50},
+{"id":"TR-118","name":"Geräucherte Kräuter (Päckchen)","type":"Gewürz","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Aromatische Kräuter für Suppen und Braten.","effect":"Verbessert Geschmack","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":36},
+{"id":"TR-119","name":"Kleiner Mondstein (Schmuck)","type":"Kuriosität","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Polierter Stein mit mildem Schimmer.","effect":"Kosmetisch / leichter Talisman","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+{"id":"TR-120","name":"Pfeilköcher (leder)","type":"Zubehör","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Praktischer Köcher für Pfeile.","effect":"Aktions-Organisation","buyPrice":{"B":0,"S":12,"G":0,"P":0},"sellPrice":{"B":0,"S":4,"G":0,"P":0},"stock":18},
+{"id":"TR-121","name":"Kleines Einhandgewehr (mechanisch)","type":"Waffe","vendorId":"trav","rarity":"Rare","minFame":3,"desc":"Primitive Schussvorrichtung für Notfälle.","effect":"+3 Fernkampfschaden (einmalig)","buyPrice":{"B":0,"S":0,"G":3,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":2},
+{"id":"TR-122","name":"Kerzen (Stück, 6er)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kerzenbündel für Notbeleuchtung.","effect":"Lichtquelle (kurz)","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":60},
+{"id":"TR-123","name":"Treibholz-Schaber","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Schaber zum Reinigen und Bearbeiten von Holz.","effect":"Holzbearbeitung (klein)","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":40},
+{"id":"TR-124","name":"Kleiner Spiegelkasten (Reise)","type":"Aufbewahrung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Praktischer Kasten mit Spiegel und Fächern.","effect":"Aufbewahrung für Schmuck","buyPrice":{"B":0,"S":18,"G":0,"P":0},"sellPrice":{"B":0,"S":6,"G":0,"P":0},"stock":12},
+{"id":"TR-125","name":"Kleine Glocke (Tier)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Glocke zum Anbringen an Tieren oder als Signal.","effect":"Signal/Alarm","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":40},
+{"id":"TR-126","name":"Sehrohr (klein, Glas)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Verbesserte Sicht in der Ferne.","effect":"+2 Wahrnehmung (optisch)","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+{"id":"TR-127","name":"Getrocknete Pilze (Pakete)","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Essbare, getrocknete Pilze.","effect":"Kleine Nahrungsquelle","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":28},
+{"id":"TR-128","name":"Handgeschnitzter Löffel","type":"Geschirr","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Schöner Löffel aus hartem Holz.","effect":"Essen möglich","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":40},
+{"id":"TR-129","name":"Kleines Wettermesser","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Einfaches Instrument zur Temperaturmessung.","effect":"Wetterabschätzung (rol.)","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":35},
+{"id":"TR-130","name":"Robuster Packriemen","type":"Zubehör","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Erleichtert das Tragen schwerer Lasten.","effect":"Tragekapazität +1 (praktisch)","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":20},
+{"id":"TR-131","name":"Reiseflasche mit Gravur","type":"Geschirr","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Flasche mit persönlicher Gravur, beliebt als Geschenk.","effect":"Kosmetisch / Behälter","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":5},
+{"id":"TR-132","name":"Kleiner Ambosshaken","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Haken zum Aufhängen von Ausrüstung am Zelt.","effect":"Befestigung","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":40},
+{"id":"TR-133","name":"Kleine Feldflöte (Bambus)","type":"Instrument","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Einfaches Instrument zur Unterhaltung unterwegs.","effect":"Unterhaltung (rol.)","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":45},
+{"id":"TR-134","name":"Notkompass (billig)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Einfacher Kompass, nicht sehr genau.","effect":"Orientierung (behelfsmäßig)","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":50},
+{"id":"TR-135","name":"Kleine Schürze (Koch)","type":"Kleidung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Praktische Schürze zum Kochen und Handwerk.","effect":"Schmutzschutz","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+{"id":"TR-136","name":"Komprimierte Feldrationen (Pack)","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Sehr kompakte Nahrungsportionen für lange Reisen.","effect":"Sättigung hoch (klein)","buyPrice":{"B":0,"S":30,"G":0,"P":0},"sellPrice":{"B":0,"S":10,"G":0,"P":0},"stock":18},
+{"id":"TR-137","name":"Notfalldeichsel (Ersatzrad)","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Ersatzteil für Wagen und Karren.","effect":"Reparaturhilfe","buyPrice":{"B":0,"S":20,"G":0,"P":0},"sellPrice":{"B":0,"S":6,"G":0,"P":0},"stock":10},
+{"id":"TR-138","name":"Wanderflammenspray (Ölgemisch)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Sicher verpacktes Spray zur schnellen Entzündung.","effect":"Feuer schnell erzeugen","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+{"id":"TR-139","name":"Warenetiketten (Blatt)","type":"Papier","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Leere Etiketten zum Beschriften von Packstücken.","effect":"Organisation","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":60},
+{"id":"TR-140","name":"Kleine Taschenlampe (Keramik, robust)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Robuste Lampe, bruchsicher verpackt.","effect":"Lichtquelle","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":5},
+{"id":"TR-141","name":"Reisetagebuch (mit Schloss)","type":"Papier","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Tagebuch mit kleinem Schloss zur Sicherung von Notizen.","effect":"Privatsphäre für Aufzeichnungen","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":6},
+{"id":"TR-142","name":"Kleines Fermentationsset","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Set zum Einlegen und Fermentieren von Lebensmitteln unterwegs.","effect":"Haltbarmachung von Lebensmitteln","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":3},
+{"id":"TR-143","name":"Miniatur-Wasserrad (Spielzeug)","type":"Kuriosität","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleines Wasserrad als Spielzeug und Lehrstück.","effect":"Unterhaltung / Lehre","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":20},
+{"id":"TR-144","name":"Geringe Elixierprobe (fläschchen)","type":"Trank","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Probe eines milden Elixiers aus fernen Landen.","effect":"Kleine Regeneration / Wohlbefinden","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":4},
+{"id":"TR-145","name":"Verzierte Tuschfeder","type":"Papier","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Schöne Feder zum Schreiben mit Tinte.","effect":"Schreibkomfort","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":6},
+{"id":"TR-146","name":"Rostfreie Nähnadel (Set)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Nadeln, die nicht rosten, ideal für feuchte Regionen.","effect":"Reparatur (langlebig)","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":45},
+{"id":"TR-147","name":"Kleine Handwaage (präzise)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Präzisionswaage für Gewürze und Edelsteine.","effect":"Wiegen genau","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+{"id":"TR-148","name":"Exotisches Stoffmuster (Meter)","type":"Material","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Schöne Stoffbahn mit fremdländischem Muster.","effect":"Verarbeitung zu Kleidung","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":3},
+{"id":"TR-149","name":"Kleines Laternenöl (hochkonzentriert)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Effizientes Öl, brennt länger als normales Öl.","effect":"Längere Lichtdauer","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":20},
+{"id":"TR-150","name":"Mysteriöse Muschel (Sammlerstück)","type":"Kuriosität","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Schöne, polierte Muschel mit ungewöhnlichem Klang.","effect":"Kosmetisch / Sammlerstück","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":2},
+{"id":"TR-151","name":"Dietrich-Set (Stahl)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Feines Set zum Öffnen einfacher Schlösser.","effect":"+2 Schlösserknacken","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":20,"G":0,"P":0},"stock":5},
+{"id":"TR-152","name":"Schlafsack (extrem warm)","type":"Bettzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Sehr warmer Schlafsack für frostige Regionen.","effect":"Schlaf +2 Komfort kalt","buyPrice":{"B":0,"S":20,"G":0,"P":0},"sellPrice":{"B":0,"S":6,"G":0,"P":0},"stock":10},
+{"id":"TR-153","name":"Schlafsack (leicht)","type":"Bettzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Leichter Schlafsack für warmes Wetter.","effect":"Schlaf +1 Komfort","buyPrice":{"B":0,"S":12,"G":0,"P":0},"sellPrice":{"B":0,"S":4,"G":0,"P":0},"stock":14},
+{"id":"TR-154","name":"Reisehammer (klein)","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleiner Hammer für Zelte und Reparaturen.","effect":"Zeltaufbau +1","buyPrice":{"B":16,"S":0,"G":0,"P":0},"sellPrice":{"B":6,"S":0,"G":0,"P":0},"stock":20},
+{"id":"TR-155","name":"Mini-Kochtopf","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kompakter Topf aus gehärtetem Eisen.","effect":"Kochen möglich","buyPrice":{"B":0,"S":14,"G":0,"P":0},"sellPrice":{"B":0,"S":5,"G":0,"P":0},"stock":12},
+{"id":"TR-156","name":"Kochlöffel (Eiche)","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Dicker Holzlöffel, ideal für Suppen.","effect":"Kochen +1","buyPrice":{"B":4,"S":0,"G":0,"P":0},"sellPrice":{"B":1,"S":0,"G":0,"P":0},"stock":40},
+{"id":"TR-157","name":"Wanderhose (verstärkt)","type":"Kleidung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Robuste Hose aus strapazierfähigem Stoff.","effect":"+1 Robustheit","buyPrice":{"B":0,"S":22,"G":0,"P":0},"sellPrice":{"B":0,"S":7,"G":0,"P":0},"stock":12},
+{"id":"TR-158","name":"Handschuhe (Leder)","type":"Kleidung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Schlichte Lederhandschuhe.","effect":"+1 Griffkraft","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":25},
+{"id":"TR-159","name":"Reiseflasche (Kupfer)","type":"Geschirr","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kupferne Flasche, hält Getränke leicht kühl.","effect":"Behälter","buyPrice":{"B":0,"S":14,"G":0,"P":0},"sellPrice":{"B":0,"S":5,"G":0,"P":0},"stock":16},
+{"id":"TR-160","name":"Holzspaten (klein)","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleiner Spaten für Lagerarbeiten.","effect":"Grabarbeiten +1","buyPrice":{"B":12,"S":0,"G":0,"P":0},"sellPrice":{"B":4,"S":0,"G":0,"P":0},"stock":22},
+
+{"id":"TR-161","name":"Bernsteinanhänger","type":"Schmuck","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Kleiner Anhänger aus warmem Bernstein.","effect":"Leichter Fokusbonus","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":25,"G":0,"P":0},"stock":5},
+{"id":"TR-162","name":"Mini-Schachspiel","type":"Spielzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Winziges Schachbrett für Reisen.","effect":"Unterhaltung","buyPrice":{"B":0,"S":12,"G":0,"P":0},"sellPrice":{"B":0,"S":4,"G":0,"P":0},"stock":18},
+{"id":"TR-163","name":"Holzflöte (klarer Ton)","type":"Instrument","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Einfache Flöte mit überraschend klarem Ton.","effect":"Musik (rol.)","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":28},
+{"id":"TR-164","name":"Kleine Pfeife (Messing)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Signalpfeife aus Messing.","effect":"Signal/Alarm","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":40},
+{"id":"TR-165","name":"Aufrollseil (10m)","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Nützlich für Klettern und Zeltbau.","effect":"Klettern +1","buyPrice":{"B":0,"S":14,"G":0,"P":0},"sellPrice":{"B":0,"S":5,"G":0,"P":0},"stock":20},
+{"id":"TR-166","name":"Wasserdichte Karte (Region)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Wetterfeste Lokalkarte.","effect":"Orientierung +1","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":18,"G":0,"P":0},"stock":3},
+
+{"id":"TR-167","name":"Kräuterbeutel (Energetisch)","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kräutermischung für schnelle Regeneration.","effect":"+1 Energie","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":30},
+{"id":"TR-168","name":"Reise-Brotlaib","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Haltbares Brot.","effect":"Sättigt leicht","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":40},
+{"id":"TR-169","name":"Feldsuppe (Konserve)","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Dicke, herzhafte Suppe.","effect":"Sättigung mittel","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":30},
+{"id":"TR-170","name":"Trockenfleisch-Rolle","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Salzig, lange haltbar.","effect":"Sättigung mittel","buyPrice":{"B":0,"S":12,"G":0,"P":0},"sellPrice":{"B":0,"S":4,"G":0,"P":0},"stock":28},
+
+{"id":"TR-171","name":"Kleines Schärföl","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Öl zur Pflege von Klingen.","effect":"Waffenpflege","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":35},
+{"id":"TR-172","name":"Kleines Reisemesser","type":"Waffe","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Schlichtes Mithril-loses Messer.","effect":"+1 Schaden","buyPrice":{"B":20,"S":0,"G":0,"P":0},"sellPrice":{"B":8,"S":0,"G":0,"P":0},"stock":20},
+{"id":"TR-173","name":"Wurfspeer (leicht)","type":"Waffe","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Ein leichter Wurfspeer.","effect":"+1 Fernkampfschaden","buyPrice":{"B":30,"S":0,"G":0,"P":0},"sellPrice":{"B":12,"S":0,"G":0,"P":0},"stock":12},
+{"id":"TR-174","name":"Mini-Streitaxt","type":"Waffe","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kompakte Axt mit kurzer Klinge.","effect":"+1 Schaden","buyPrice":{"B":0,"S":16,"G":0,"P":0},"sellPrice":{"B":0,"S":5,"G":0,"P":0},"stock":15},
+
+{"id":"TR-175","name":"Leichte Kettenkapuze","type":"Rüstung","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Schützt Kopf & Hals.","effect":"+2 Rüstung (leicht)","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":4},
+{"id":"TR-176","name":"Lederschultern","type":"Rüstung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Einfacher Rüstungsschutz.","effect":"+1 Rüstung","buyPrice":{"B":0,"S":14,"G":0,"P":0},"sellPrice":{"B":0,"S":4,"G":0,"P":0},"stock":18},
+{"id":"TR-177","name":"Stoffrobe (Reise)","type":"Kleidung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Lockere Kleidung gegen Hitze.","effect":"Hitzeresistenz leicht","buyPrice":{"B":0,"S":12,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":15},
+
+{"id":"TR-178","name":"Goldene Haarspange","type":"Schmuck","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Elegante Spange mit Goldrand.","effect":"Kosmetisch","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":6},
+{"id":"TR-179","name":"Talisman des Windhauchs","type":"Wondrous","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Leichter Talisman mit Windsymbol.","effect":"+1 Geschick (kurz)","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+
+{"id":"TR-180","name":"Mini-Fackellaterne","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleine Metalllaterne.","effect":"Lichtquelle","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":18},
+
+{"id":"TR-181","name":"Reisefeuer-Pulver","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Schnellzündpulver.","effect":"Feuer sofort","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+
+{"id":"TR-182","name":"Wachskerze (duftend)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Duftet angenehm.","effect":"Beruhigung","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":35},
+
+{"id":"TR-183","name":"Reiseparfüm","type":"Luxus","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Hochwertiger Duft.","effect":"Charisma +1 (rol.)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":5},
+
+{"id":"TR-184","name":"Zelt (klein, 2 Personen)","type":"Camping","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Einfaches Reisezelt.","effect":"Schlafen drinnen","buyPrice":{"B":0,"S":25,"G":0,"P":0},"sellPrice":{"B":0,"S":8,"G":0,"P":0},"stock":8},
+{"id":"TR-185","name":"Zelt (groß, 4 Personen)","type":"Camping","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Stabiles Zelt für Gruppen.","effect":"Schlafen drinnen","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+
+{"id":"TR-186","name":"Hartholz-Kochbrett","type":"Geschirr","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Massives Brett.","effect":"Kochen +1","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+
+{"id":"TR-187","name":"Mini-Fischernetz","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleines Netz für Bachfischerei.","effect":"Fischen +1","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":14},
+
+{"id":"TR-188","name":"Reiseseil (30m, schwer)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Sehr stabiles Seil.","effect":"Klettern +2","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":6},
+
+{"id":"TR-189","name":"Holzfigur (Schildkröte)","type":"Spielzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Niedliches Holzspielzeug.","effect":"Unterhaltung","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":35},
+
+{"id":"TR-190","name":"Reiseteppich (dünn)","type":"Camping","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Wärmt leicht.","effect":"Schlafen +1","buyPrice":{"B":0,"S":14,"G":0,"P":0},"sellPrice":{"B":0,"S":5,"G":0,"P":0},"stock":18},
+
+{"id":"TR-191","name":"Reisekojis (groß)","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Haltbare Teigrippen.","effect":"Sättigung hoch","buyPrice":{"B":0,"S":14,"G":0,"P":0},"sellPrice":{"B":0,"S":5,"G":0,"P":0},"stock":20},
+
+{"id":"TR-192","name":"Mini-Pfeffermaschine","type":"Gewürz","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Für Gewürze unterwegs.","effect":"Kochen enhanced","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+
+{"id":"TR-193","name":"Schmiedekreide","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Markiert Metall.","effect":"Handwerk +1","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":22},
+
+{"id":"TR-194","name":"Mini-Weinflasche (süß)","type":"Trank","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Sehr süßer Wein.","effect":"Charisma +1 (kurz)","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":20},
+
+{"id":"TR-195","name":"Räucherholz (duftend)","type":"Luxus","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Aromatisches Holz.","effect":"Beruhigend","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":25},
+
+{"id":"TR-196","name":"Fein geschliffene Perle","type":"Kuriosität","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Glänzt wie Mondlicht.","effect":"+1 Fokus","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+
+{"id":"TR-197","name":"Mini-Lederbandolier","type":"Zubehör","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Für kleine Flaschen.","effect":"+3 kleine Slots","buyPrice":{"B":0,"S":18,"G":0,"P":0},"sellPrice":{"B":0,"S":5,"G":0,"P":0},"stock":10},
+
+{"id":"TR-198","name":"Kleine Schreibrolle (verziert)","type":"Papier","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Dekorativ & haltbar.","effect":"Schreiben +1","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+
+{"id":"TR-199","name":"Bernsteinring","type":"Schmuck","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Warmer Stein, hellbraun.","effect":"+1 Konzentration","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+
+{"id":"TR-200","name":"Schwerer Reiseponcho","type":"Kleidung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Wachsversiegelt.","effect":"Nässe Resistent","buyPrice":{"B":0,"S":18,"G":0,"P":0},"sellPrice":{"B":0,"S":6,"G":0,"P":0},"stock":15},
+
+{"id":"TR-201","name":"Mini-Kesselkette","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Zum Aufhängen von Kesseln.","effect":"Kochen stabil","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":30},
+
+{"id":"TR-202","name":"Reiseschüssel (Holz)","type":"Geschirr","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Robuste Holzschüssel.","effect":"Essen","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":40},
+
+{"id":"TR-203","name":"Faltbare Wasserwanne","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Für Waschen & Transport.","effect":"Hygiene","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+
+{"id":"TR-204","name":"Miniatur-Reitgerte","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Für leichte Tierführung.","effect":"+1 Reiten","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":20},
+
+{"id":"TR-205","name":"Bernsteinohrring (einzeln)","type":"Schmuck","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Warmer Glanz.","effect":"+1 Wahrnehmung","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+
+{"id":"TR-206","name":"Trankfläschchen (leer)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Kleine Flasche.","effect":"Behälter","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":50},
+
+{"id":"TR-207","name":"Mini-Schreibset","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Feder & Tinte.","effect":"Schreiben","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+
+{"id":"TR-208","name":"Taschen-Polierstein","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Zum Reinigen kleiner Metallteile.","effect":"Pflege","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":28},
+
+{"id":"TR-209","name":"Miniatur-Truhenanhänger","type":"Kuriosität","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Süßes Dekostück.","effect":"Kosmetisch","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":40},
+
+{"id":"TR-210","name":"Holzsorte-Sammelset","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Kleine Holzproben inkl. Infozettel.","effect":"Wissen Wald +1","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":3},
+
+{"id":"TR-211","name":"Rückspiegel-Kristall","type":"Wondrous","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Magischer Blick nach hinten.","effect":"Rückwärtssicht 10m","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":2},
+
+{"id":"TR-212","name":"Schleifband (Leder)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Zum Schärfen.","effect":"Waffenschärfe +1","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+
+{"id":"TR-213","name":"Mini-Knotenbuch","type":"Papier","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Zeigt 20 Knoten.","effect":"Knotenwissen +1","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":40},
+
+{"id":"TR-214","name":"Notfallnägel-Set","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Für Reparaturen.","effect":"Bauen +1","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":50},
+
+{"id":"TR-215","name":"Miniatur-Kupfergong","type":"Instrument","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Kleiner Gong.","effect":"Signal (laut)","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+
+{"id":"TR-216","name":"Holz-Messbecher","type":"Geschirr","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Für Kochen.","effect":"Kochen exakt","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":40},
+
+{"id":"TR-217","name":"Truhenverriegelung (mini)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Ersatzschloss.","effect":"Schutz +1","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+
+{"id":"TR-218","name":"Tigerauge-Stein (geschliffen)","type":"Kuriosität","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Glänzender Stein.","effect":"+1 Entschlossenheit","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":2},
+
+{"id":"TR-219","name":"Mini-Reisekoffer","type":"Aufbewahrung","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Für Kleinkram.","effect":"+4 Slots","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":6},
+
+{"id":"TR-220","name":"Miniaturasche-Schrein","type":"Wondrous","vendorId":"trav","rarity":"Rare","minFame":3,"desc":"Speichert winzige Mengen Mana.","effect":"+1 Mana-Speicher","buyPrice":{"B":0,"S":0,"G":3,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":2},
+
+{"id":"TR-221","name":"Kristallkugel (klein)","type":"Wondrous","vendorId":"trav","rarity":"Legendary","minFame":8,"desc":"Glasklarer Orb.","effect":"+3 Wahrnehmung, Visionen möglich","buyPrice":{"B":0,"S":0,"G":0,"P":1},"sellPrice":{"B":0,"S":0,"G":20,"P":0},"stock":1},
+
+// ————— LEGENDÄRE, SCHWER VERFLUCHTE ARTEFAKTE —————
+
+{"id":"TR-222","name":"Fluchamulett des Unruhigen Schattens","type":"Cursed","vendorId":"trav","rarity":"Legendary","minFame":10,"desc":"Altes Amulett, das im Dunkeln flüstert.","effect":"+4 Geschick, aber Schlaf −3, sporadische Halluzinationen","buyPrice":{"B":0,"S":0,"G":0,"P":2},"sellPrice":{"B":0,"S":0,"G":40,"P":0},"stock":1},
+
+{"id":"TR-223","name":"Ring der Ewigen Glut","type":"Cursed","vendorId":"trav","rarity":"Legendary","minFame":10,"desc":"Roter Stein, heiß wie Kohlen.","effect":"+4 Feuerzauber, aber −5 Wasserresistenz, Verbrennungen möglich","buyPrice":{"B":0,"S":0,"G":0,"P":2},"sellPrice":{"B":0,"S":0,"G":40,"P":0},"stock":1},
+
+{"id":"TR-224","name":"Klinge der Zweiten Stimme","type":"Cursed Waffe","vendorId":"trav","rarity":"Legendary","minFame":9,"desc":"Verfluchte Klinge, die mit dem Träger spricht.","effect":"+5 Schaden, aber Wahn-Probe bei jedem Kampf","buyPrice":{"B":0,"S":0,"G":0,"P":3},"sellPrice":{"B":0,"S":0,"G":50,"P":0},"stock":1},
+
+{"id":"TR-225","name":"Schattenkapuze des Zweifelnden","type":"Cursed","vendorId":"trav","rarity":"Legendary","minFame":9,"desc":"Hauchdünne Kapuze.","effect":"+3 Schleichen, aber soziale Proben −4","buyPrice":{"B":0,"S":0,"G":0,"P":1},"sellPrice":{"B":0,"S":0,"G":25,"P":0},"stock":1},
+
+{"id":"TR-226","name":"Amulett der Falschen Wahrheit","type":"Cursed","vendorId":"trav","rarity":"Legendary","minFame":10,"desc":"Es verändert die Wahrnehmung der Realität.","effect":"+3 Intelligenz, aber −6 Weisheit","buyPrice":{"B":0,"S":0,"G":0,"P":2},"sellPrice":{"B":0,"S":0,"G":40,"P":0},"stock":1},
+
+{"id":"TR-227","name":"Verfluchter Beutel der Endloslast","type":"Cursed","vendorId":"trav","rarity":"Legendary","minFame":12,"desc":"Unfassbar tiefer Beutel.","effect":"+30 Inventarplätze, belastet aber wie 50kg","buyPrice":{"B":0,"S":0,"G":0,"P":3},"sellPrice":{"B":0,"S":0,"G":50,"P":0},"stock":1},
+
+{"id":"TR-228","name":"Flüsterwürfel (verboten)","type":"Cursed","vendorId":"trav","rarity":"Legendary","minFame":10,"desc":"Würfel, der Schicksal verzerrt.","effect":"+5 Glück, aber 5% Chance pro Tag: Dämon ruft nach dir","buyPrice":{"B":0,"S":0,"G":0,"P":2},"sellPrice":{"B":0,"S":0,"G":40,"P":0},"stock":1},
+
+// — RETURN TO NORMAL RARE/COMMON ITEMS —
+
+{"id":"TR-229","name":"Kleiner Tauchsieder (Magisch)","type":"Wondrous","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Erhitzt Wasser durch Magie.","effect":"Erhitzen","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+
+{"id":"TR-230","name":"Mini-Schraubschlüssel","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Für Metallarbeiten.","effect":"Reparatur","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":40},
+
+{"id":"TR-231","name":"Holzperlen-Armband","type":"Schmuck","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Einfache Holzperlen.","effect":"Kosmetisch","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":35},
+
+{"id":"TR-232","name":"Miniatur-Feuerpfanne","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Zum Braten.","effect":"Kochen +1","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":20},
+
+{"id":"TR-233","name":"Miniatur-Abflussheber","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Komisch aber nützlich.","effect":"Reinigen","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":30},
+
+{"id":"TR-234","name":"Bernstein-Kollektion (klein)","type":"Luxus","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"5 Mini-Steine.","effect":"Schmuckherstellung","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+
+{"id":"TR-235","name":"Kleiner Runenstein (leer)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Kann Magie speichern.","effect":"+1 Aufladung","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":6},
+
+{"id":"TR-236","name":"Kleines Duftspray","type":"Luxus","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Schneller Duft.","effect":"Kosmetisch","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+
+{"id":"TR-237","name":"Mini-Teleskop","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Klein aber stark.","effect":"+2 Wahrnehmung","buyPrice":{"B":0,"S":0,"G":2,"P":0},"sellPrice":{"B":0,"S":0,"G":1,"P":0},"stock":3},
+
+{"id":"TR-238","name":"Kupferpfanne (mini)","type":"Werkzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Guter Wärmeleiter.","effect":"Kochen","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":20},
+
+{"id":"TR-239","name":"Leichte Feldhaube","type":"Rüstung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Stabiler Schutz.","effect":"+1 Rüstung","buyPrice":{"B":0,"S":12,"G":0,"P":0},"sellPrice":{"B":0,"S":4,"G":0,"P":0},"stock":15},
+
+{"id":"TR-240","name":"Holzschale (groß)","type":"Geschirr","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Große Schale.","effect":"Essen","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":35},
+
+{"id":"TR-241","name":"Miniatur-Räucherofen","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Räuchert Fleisch.","effect":"Haltbarkeit +","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0},"stock":3},
+
+{"id":"TR-242","name":"Reisesuppe (scharf)","type":"Essen","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Scharf und sehr sättigend.","effect":"Sättigung hoch","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0},"stock":25},
+
+{"id":"TR-243","name":"Holzwürfel (weiß)","type":"Spielzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Unbemalter Würfel.","effect":"Würfelbares Werkzeug","buyPrice":{"B":0,"S":3,"G":0},"sellPrice":{"B":0,"S":1,"G":0},"stock":40},
+
+{"id":"TR-244","name":"Kupfermesser (verziert)","type":"Waffe","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Leichte Verzierung.","effect":"+2 Schaden","buyPrice":{"B":0,"S":30,"G":0},"sellPrice":{"B":0,"S":10,"G":0},"stock":5},
+
+{"id":"TR-245","name":"Ersatz-Reißverschluss (Satz)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Für Taschen etc.","effect":"Reparatur","buyPrice":{"B":0,"S":3,"G":0},"sellPrice":{"B":0,"S":1,"G":0},"stock":30},
+
+{"id":"TR-246","name":"Mini-Mörser (Stein)","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Zum Zerstoßen von Kräutern.","effect":"Alchemie +1","buyPrice":{"B":0,"S":10,"G":0},"sellPrice":{"B":0,"S":3,"G":0},"stock":20},
+
+{"id":"TR-247","name":"Handheld-Kristalllicht","type":"Wondrous","vendorId":"trav","rarity":"Rare","minFame":2,"desc":"Erzeugt helles Licht ohne Öl.","effect":"Lichtquelle (mag.)","buyPrice":{"B":0,"S":0,"G":2},"sellPrice":{"B":0,"S":0,"G":1},"stock":3},
+
+{"id":"TR-248","name":"Mini-Schachkönig (Holz)","type":"Dekoration","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Holzfigur.","effect":"Kosmetisch","buyPrice":{"B":0,"S":3,"G":0},"sellPrice":{"B":0,"S":1,"G":0},"stock":30},
+
+{"id":"TR-249","name":"Feinpolierte Holzzange","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Für Feuerstellen.","effect":"Feuerkontrolle","buyPrice":{"B":0,"S":8,"G":0},"sellPrice":{"B":0,"S":3,"G":0},"stock":20},
+
+{"id":"TR-250","name":"Miniatur-Falkenhelm","type":"Rüstung","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Symbolischer Helm.","effect":"+1 Einschüchtern","buyPrice":{"B":0,"S":0,"G":1},"sellPrice":{"B":0,"S":0,"G":0},"stock":4},
+
+{"id":"TR-251","name":"Reise-Kartenset","type":"Spielzeug","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Altes Kartendeck.","effect":"Unterhaltung","buyPrice":{"B":0,"S":6,"G":0},"sellPrice":{"B":0,"S":2,"G":0},"stock":40},
+
+{"id":"TR-252","name":"Miniatur-Schwertanhänger","type":"Schmuck","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Schmuckstück.","effect":"Kosmetisch","buyPrice":{"B":0,"S":4,"G":0},"sellPrice":{"B":0,"S":1,"G":0},"stock":35},
+
+{"id":"TR-253","name":"Mini-Kompass (präzise)","type":"Tool","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Sehr präzise Anzeige.","effect":"+2 Navigation","buyPrice":{"B":0,"S":0,"G":1},"sellPrice":{"B":0,"S":0,"G":0},"stock":5},
+
+{"id":"TR-254","name":"Miniatur-Pflanzentasche","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Für Kräuter.","effect":"+1 Kräuterkunde","buyPrice":{"B":0,"S":5,"G":0},"sellPrice":{"B":0,"S":2,"G":0},"stock":28},
+
+{"id":"TR-255","name":"Fein gewobener Stirnbandstoff","type":"Kleidung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Wird nicht warm.","effect":"Komfort +1","buyPrice":{"B":0,"S":5,"G":0},"sellPrice":{"B":0,"S":2,"G":0},"stock":22},
+
+{"id":"TR-256","name":"Mini-Truhe mit Geheimfach","type":"Aufbewahrung","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Versteck für Kleines.","effect":"+1 versteckter Slot","buyPrice":{"B":0,"S":0,"G":1},"sellPrice":{"B":0,"S":0,"G":0},"stock":5},
+
+{"id":"TR-257","name":"Miniatur-Besen","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Zum Reinigen.","effect":"+1 Putzen","buyPrice":{"B":0,"S":3,"G":0},"sellPrice":{"B":0,"S":1,"G":0},"stock":40},
+
+{"id":"TR-258","name":"Kleines Schutzamulett","type":"Wondrous","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Leichter Schutz.","effect":"+1 Resistenz","buyPrice":{"B":0,"S":0,"G":1},"sellPrice":{"B":0,"S":0,"G":0},"stock":6},
+
+{"id":"TR-259","name":"Miniatur-Schriftrollenbehälter","type":"Aufbewahrung","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Schützt Rollen.","effect":"Schutz","buyPrice":{"B":0,"S":6,"G":0},"sellPrice":{"B":0,"S":2,"G":0},"stock":30},
+
+{"id":"TR-260","name":"Holzlöffel (set 3)","type":"Geschirr","vendorId":"trav","rarity":"Common","minFame":0,"desc":"3 Löffel.","effect":"Essen","buyPrice":{"B":0,"S":4,"G":0},"sellPrice":{"B":0,"S":1,"G":0},"stock":40},
+
+{"id":"TR-261","name":"Miniatur-Räucherlampe","type":"Wondrous","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Duftlampe.","effect":"Beruhigung","buyPrice":{"B":0,"S":0,"G":1},"sellPrice":{"B":0,"S":0,"G":0},"stock":4},
+
+{"id":"TR-262","name":"Kleiner Kartenhalter","type":"Zubehör","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Für Kartenspiele.","effect":"Organisation","buyPrice":{"B":0,"S":3,"G":0},"sellPrice":{"B":0,"S":1,"G":0},"stock":35},
+
+{"id":"TR-263","name":"Holzbecher (leicht)","type":"Geschirr","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Sehr leichter Becher.","effect":"Trinken","buyPrice":{"B":0,"S":3,"G":0},"sellPrice":{"B":0,"S":1,"G":0},"stock":50},
+
+{"id":"TR-264","name":"Miniatur-Schriftrollenfeder","type":"Tool","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Feine Feder.","effect":"Schreiben +1","buyPrice":{"B":0,"S":3,"G":0},"sellPrice":{"B":0,"S":1,"G":0},"stock":40},
+
+{"id":"TR-265","name":"Glücksstein (klein)","type":"Kuriosität","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Scheinbar warm.","effect":"+1 Glück","buyPrice":{"B":0,"S":0,"G":1},"sellPrice":{"B":0,"S":0,"G":0},"stock":5},
+
+{"id":"TR-266","name":"Runenstoffbeutel","type":"Aufbewahrung","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Magischer Stoff.","effect":"+1 Zauberstabilität","buyPrice":{"B":0,"S":0,"G":1},"sellPrice":{"B":0,"S":0,"G":0},"stock":6},
+
+{"id":"TR-267","name":"Miniatur-Glockenschrein","type":"Kuriosität","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Leiser Ton.","effect":"+1 Ruhe","buyPrice":{"B":0,"S":0,"G":1},"sellPrice":{"B":0,"S":0,"G":0},"stock":6},
+
+{"id":"TR-268","name":"Miniatur-Kochsand","type":"Material","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Hält Hitze gut.","effect":"Kochen +1","buyPrice":{"B":0,"S":4,"G":0},"sellPrice":{"B":0,"S":1,"G":0},"stock":40},
+
+{"id":"TR-269","name":"Bissfester Lederhandschuh","type":"Kleidung","vendorId":"trav","rarity":"Rare","minFame":1,"desc":"Für Tierführung.","effect":"+1 Tierzähmung","buyPrice":{"B":0,"S":0,"G":1},"sellPrice":{"B":0,"S":0,"G":0},"stock":6},
+
+{"id":"TR-270","name":"Reisebuch (abgenutzt)","type":"Papier","vendorId":"trav","rarity":"Common","minFame":0,"desc":"Altes, aber stabiles Notizbuch.","effect":"Notizen","buyPrice":{"B":0,"S":4,"G":0},"sellPrice":{"B":0,"S":1,"G":0},"stock":40},
+{"id":"TV-01","name":"Hausgemachter Honigwein (mild)","type":"Getränk","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Sanfter süßer Met.","effect":"+1 Stimmung","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":40},
+{"id":"TV-02","name":"Starker Honigwein (trocken)","type":"Getränk","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Trocken, kräftig.","effect":"+1 Mut","buyPrice":{"B":0,"S":7,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":35},
+{"id":"TV-03","name":"Würziger Kräutermet","type":"Getränk","vendorId":"tavern","rarity":"Rare","minFame":1,"desc":"Met mit starken Kräutern.","effect":"+1 Abwehr","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":20,"G":0,"P":0},"stock":12},
+{"id":"TV-04","name":"Glutwein mit Honig","type":"Getränk","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Warm und süß.","effect":"Wärme +1","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":30},
+{"id":"TV-05","name":"Honigbier (leicht)","type":"Getränk","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Bier mit Honignote.","effect":"+1 Stimmung","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":45},
+
+{"id":"TV-06","name":"Warmes Brot mit Honigbutter","type":"Essen","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Frisch aus dem Ofen.","effect":"Sättigt gut","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":25},
+{"id":"TV-07","name":"Käse-Honig-Scheibe","type":"Essen","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Süß-würzig.","effect":"+1 Stimmung","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":20},
+{"id":"TV-08","name":"Gebratene Wurzelgemüseplatte","type":"Essen","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Deftig und warm.","effect":"Leicht nährend","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":25},
+{"id":"TV-09","name":"Pikanter Fleischspieß","type":"Essen","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Sehr würzig.","effect":"+1 Energie","buyPrice":{"B":0,"S":7,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":22},
+{"id":"TV-10","name":"Pilzragout (sämig)","type":"Essen","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Erdig und aromatisch.","effect":"+1 Fokus","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":20},
+
+{"id":"TV-11","name":"Scharfer Eintopf","type":"Essen","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Mit feurigen Kräutern.","effect":"Wärmt stark","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":18},
+{"id":"TV-12","name":"Fischplatte (einfach)","type":"Essen","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Frischer Bachfisch.","effect":"+1 Regeneration","buyPrice":{"B":0,"S":7,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":15},
+
+{"id":"TV-13","name":"Nüsse (geröstet)","type":"Snack","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Knusprig.","effect":"+1 Stimmung","buyPrice":{"B":0,"S":2,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":30},
+{"id":"TV-14","name":"Trockenfrucht-Mix","type":"Snack","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Süß und haltbar.","effect":"Leichte Energie","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":25},
+
+{"id":"TV-15","name":"Krug Wasser (frisch)","type":"Getränk","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Aus dem Dorfbrunnen.","effect":"Hydration","buyPrice":{"B":0,"S":1,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":80},
+{"id":"TV-16","name":"Kräutertee (mild)","type":"Getränk","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Beruhigend.","effect":"Stress -1","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":50},
+
+{"id":"TV-17","name":"Einzelzimmer (einfach)","type":"Dienstleistung","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"1 Bett, klein.","effect":"Schlaf +2","buyPrice":{"B":0,"S":35,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+{"id":"TV-18","name":"Einzelzimmer (sauber)","type":"Dienstleistung","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"1 Bett, gute Qualität.","effect":"Schlaf +3","buyPrice":{"B":0,"S":45,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+{"id":"TV-19","name":"Einzelzimmer (ruhig)","type":"Dienstleistung","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"1 Bett, sehr ruhig.","effect":"Schlaf +4","buyPrice":{"B":0,"S":55,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+{"id":"TV-20","name":"Einzelzimmer (Premium)","type":"Dienstleistung","vendorId":"tavern","rarity":"Rare","minFame":1,"desc":"Komfortables Bett.","effect":"+1 Regeneration","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":4},
+
+{"id":"TV-21","name":"Doppelzimmer (Standard)","type":"Dienstleistung","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Für zwei Personen.","effect":"Schlaf +3","buyPrice":{"B":0,"S":70,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":1},
+
+{"id":"TV-22","name":"Gruppenzimmer (6 Betten)","type":"Dienstleistung","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Großer Schlafraum.","effect":"Schlaf +1","buyPrice":{"B":0,"S":20,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":1},
+
+{"id":"TV-23","name":"Kaminplatz (Abend)","type":"Dienstleistung","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Gemütlicher Platz.","effect":"+1 Stimmung","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":999},
+
+{"id":"TV-24","name":"Leselampe (1 Abend)","type":"Dienstleistung","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Perfekt zum Lesen.","effect":"+1 Fokus","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":0,"G":0,"P":0},"stock":999},
+
+{"id":"TV-25","name":"Kamm (stabil)","type":"Gegenstand","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Für gepflegtes Haar.","effect":"Hygiene","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":20},
+{"id":"TV-26","name":"Bürste (Holz)","type":"Gegenstand","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Einfache Holzborsten.","effect":"Sauberkeit","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":20},
+{"id":"TV-27","name":"Handtuch (dick)","type":"Gegenstand","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Weicher Stoff.","effect":"Hygiene","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":15},
+
+{"id":"TV-28","name":"Seife (Kräuter)","type":"Gegenstand","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Duftet angenehm.","effect":"Hygiene +1","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":25},
+{"id":"TV-29","name":"Seife (Luxus)","type":"Gegenstand","vendorId":"tavern","rarity":"Rare","minFame":1,"desc":"Exotischer Duft.","effect":"Sozialbonus +1","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":20,"G":0,"P":0},"stock":8},
+
+{"id":"TV-30","name":"Spielkarten (neu)","type":"Spiel","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Neues Kartenset.","effect":"Unterhaltung","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":20},
+{"id":"TV-31","name":"Würfel (Set)","type":"Spiel","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Standardwürfel.","effect":"Glücksspiel","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":25},
+{"id":"TV-32","name":"Holzbrettspiel (groß)","type":"Spiel","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Unterhaltsames Brett.","effect":"Unterhaltung +1","buyPrice":{"B":0,"S":10,"G":0,"P":0},"sellPrice":{"B":0,"S":4,"G":0,"P":0},"stock":15},
+
+{"id":"TV-33","name":"Honigplätzchen","type":"Snack","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Süß und weich.","effect":"+1 Stimmung","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":30},
+{"id":"TV-34","name":"Gebäck Mix (klein)","type":"Snack","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Süße Auswahl.","effect":"+1 Energie","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":25},
+
+{"id":"TV-35","name":"Frischer Apfelkuchen","type":"Essen","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Süß und warm.","effect":"+1 Moral","buyPrice":{"B":0,"S":7,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":18},
+
+{"id":"TV-36","name":"Kräuterbeutel (klein)","type":"Gegenstand","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Einfacher Kräutermix.","effect":"Frische +1","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":20},
+
+{"id":"TV-37","name":"Öl-Lampe (einfach)","type":"Gegenstand","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Gibt Licht.","effect":"Helligkeit","buyPrice":{"B":0,"S":8,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":15},
+{"id":"TV-38","name":"Öl-Nachfüllung","type":"Gegenstand","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Für Lampen.","effect":"Brennt 4h","buyPrice":{"B":0,"S":2,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":30},
+
+{"id":"TV-39","name":"Schreibfeder (einfach)","type":"Gegenstand","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Schlichte Feder.","effect":"Schreiben","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":20},
+{"id":"TV-40","name":"Tintenfass (klein)","type":"Gegenstand","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Dunkle Tinte.","effect":"Schreiben","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":20},
+
+{"id":"TV-41","name":"Honigmilch (warm)","type":"Getränk","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Süße warme Milch.","effect":"Beruhigung +1","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":30},
+
+{"id":"TV-42","name":"Dünner Brei","type":"Essen","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Einfaches Essen.","effect":"Leichte Sättigung","buyPrice":{"B":0,"S":2,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":25},
+
+{"id":"TV-43","name":"Honigglas (klein)","type":"Gegenstand","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Purer Honig.","effect":"Heilt 1 HP (Hausregel)","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":3,"G":0,"P":0},"stock":20},
+
+{"id":"TV-44","name":"Kräuterbeutel (Beruhigend)","type":"Gegenstand","vendorId":"tavern","rarity":"Rare","minFame":1,"desc":"Sanfter Duft.","effect":"Stress -2","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":15,"G":0,"P":0},"stock":10},
+
+{"id":"TV-45","name":"Große Brotplatte","type":"Essen","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Mit Butter und Salz.","effect":"Gute Sättigung","buyPrice":{"B":0,"S":6,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":20},
+
+{"id":"TV-46","name":"Rahmtee","type":"Getränk","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Cremiger Tee.","effect":"Beruhigung","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":20},
+
+{"id":"TV-47","name":"Leichter Obstwein","type":"Getränk","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Fruchtige Note.","effect":"+1 Stimmung","buyPrice":{"B":0,"S":5,"G":0,"P":0},"sellPrice":{"B":0,"S":2,"G":0,"P":0},"stock":25},
+
+{"id":"TV-48","name":"Starker Obstwein","type":"Getränk","vendorId":"tavern","rarity":"Rare","minFame":1,"desc":"Intensiv und stark.","effect":"+1 Mut","buyPrice":{"B":0,"S":0,"G":1,"P":0},"sellPrice":{"B":0,"S":25,"G":0,"P":0},"stock":12},
+
+{"id":"TV-49","name":"Bauchwärmer-Schnaps","type":"Getränk","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Sehr stark.","effect":"+1 Wärme","buyPrice":{"B":0,"S":4,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":25},
+
+{"id":"TV-50","name":"Kaminholz-Bündel","type":"Gegenstand","vendorId":"tavern","rarity":"Common","minFame":0,"desc":"Trockenes Holz.","effect":"Brennt 2h","buyPrice":{"B":0,"S":3,"G":0,"P":0},"sellPrice":{"B":0,"S":1,"G":0,"P":0},"stock":30}
+];
+
+async function loadProductsFromFile() {
+    const fileInput = document.getElementById("jsonFileInput");
+    const status = document.getElementById("importStatus");
+
+    if (!fileInput.files[0]) {
+        status.innerText = "⚠️ Keine Datei ausgewählt!";
+        return;
+    }
+
+    try {
+        const file = fileInput.files[0];
+        const text = await file.text();
+        let json = JSON.parse(text);
+
+        if (!Array.isArray(json)) {
+            status.innerText = "❌ JSON muss ein Array enthalten!";
+            return;
+        }
+
+        // JSON → JS Objekt (Konvertierung)
+        const converted = json.map(p => ({
+            id: p.id,
+            name: p.name,
+            type: p.type,
+            vendorId: p.vendorId,
+            rarity: p.rarity,
+            minFame: p.minFame ?? 0,
+            desc: p.desc ?? "",
+            effect: p.effect ?? "",
+            buyPrice: { 
+                B: p.buyPrice?.B ?? 0,
+                S: p.buyPrice?.S ?? 0,
+                G: p.buyPrice?.G ?? 0,
+                P: p.buyPrice?.P ?? 0
+            },
+            sellPrice: { 
+                B: p.sellPrice?.B ?? 0,
+                S: p.sellPrice?.S ?? 0,
+                G: p.sellPrice?.G ?? 0,
+                P: p.sellPrice?.P ?? 0
+            },
+            stock: p.stock ?? 0
+        }));
+
+        // In Storage speichern
+        localStorage.setItem("dorf_handel_products", JSON.stringify(converted));
+
+        status.innerText = "✔️ Import abgeschlossen! Seite neu laden!";
+    }
+
+    catch (err) {
+        console.error(err);
+        status.innerText = "❌ Fehler beim Import: " + err.message;
+    }
+}
+
+  // ---------- state ----------
+  let state = { vendors:{}, products:{}, logs:{} };
+
+  function seedDefaults(){ state.vendors={}; state.products={}; state.logs={}; defaultVendors.forEach(v=>{ state.vendors[v.id]=JSON.parse(JSON.stringify(v)); state.logs[v.id]=[]; }); defaultProducts.forEach(p=>{ state.products[p.id]=JSON.parse(JSON.stringify(p)); }); persist(); }
+  function persist(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){ console.error('persist failed', e); } }
+  function load(){ try{ const raw = localStorage.getItem(STORAGE_KEY); if(!raw){ seedDefaults(); return; } const parsed = JSON.parse(raw); if(!parsed || !parsed.vendors || !parsed.products){ seedDefaults(); return; } state = parsed; state.logs = state.logs || {}; Object.keys(state.vendors).forEach(id=>{ if(!state.logs[id]) state.logs[id]=[]; }); }catch(e){ console.error('load error', e); seedDefaults(); } }
+
+  // ---------- utilities ----------
+  function addLog(vendorId, action, details){ state.logs[vendorId]=state.logs[vendorId]||[]; state.logs[vendorId].push({time:(new Date()).toLocaleString(), action, details, funds: state.vendors[vendorId]?.funds || {}}); persist(); }
+  function vendorProducts(vendorId){ return Object.values(state.products).filter(p=>p.vendorId===vendorId).sort((a,b)=>a.id.localeCompare(b.id)); }
+  function parseMoneyStr(s){ if(!s) return {B:0,S:0,G:0,P:0}; const parts = s.trim().split(/\s+/).map(x=>Number(x)||0); return {B:parts[0]||0, S:parts[1]||0, G:parts[2]||0, P:parts[3]||0}; }
+
+  // ---------- UI refs ----------
+  const vendorsContainer = document.getElementById('vendorsContainer');
+  const suggestBox = document.getElementById('suggestBox');
+  const globalProductList = document.getElementById('globalProductList');
+  const globalSearch = document.getElementById('globalSearch');
+
+  // ---------- render ----------
+  function renderVendors(){
+    vendorsContainer.innerHTML = '';
+    Object.values(state.vendors).forEach(v=>{
+      const panel = document.createElement('div'); panel.className='panel';
+      const header = document.createElement('div'); header.className='vendorHeader';
+      header.innerHTML = `<div style="font-weight:600">${v.name}</div><div class="small" style="margin-left:8px">${v.desc}</div><div style="margin-left:auto" class="small">${fmt(v.funds)}</div>`;
+      panel.appendChild(header);
+      const body = document.createElement('div'); body.className='vendorBody';
+      body.innerHTML = `
+        <div style="display:flex;gap:12px;align-items:center;justify-content:space-between">
+          <div class="small">Finanzen:</div>
+          <div>
+            B <input data-vfund="B" data-vendor="${v.id}" type="number" style="width:70px" value="${(v.funds.B||0)}">
+            S <input data-vfund="S" data-vendor="${v.id}" type="number" style="width:70px" value="${(v.funds.S||0)}">
+            G <input data-vfund="G" data-vendor="${v.id}" type="number" style="width:70px" value="${(v.funds.G||0)}">
+            P <input data-vfund="P" data-vendor="${v.id}" type="number" style="width:70px" value="${(v.funds.P||0)}">
+            <button data-setfund="${v.id}">Setzen</button>
+            <button data-discount="${v.id}">Rabatt</button>
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <div class="small">Produkte:</div>
+          <div style="margin-top:8px;overflow:auto"><table><thead><tr><th>ID</th><th>Name</th><th>Typ</th><th>Bestand</th><th>Sell</th><th>Buy</th><th>Aktion</th></tr></thead><tbody data-tbody="${v.id}"></tbody></table></div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <div class="small">Transaktionen:</div><div style="flex:1"><div id="log-${v.id}" class="log"></div></div>
+        </div>
+      `;
+      panel.appendChild(body);
+      vendorsContainer.appendChild(panel);
+
+      header.addEventListener('click', () => {
+        const open = body.style.display!=='block';
+        document.querySelectorAll('.vendorBody').forEach(b=>b.style.display='none');
+        if(open){ body.style.display='block'; renderVendorProducts(v.id); renderVendorLog(v.id); } else { body.style.display='none'; }
+      });
+    });
+    rebuildGlobalDropdown();
+  }
+
+  // build product details HTML (for dropdown)
+  function formatProductDetailsHTML(p){
+    const buy = fmt(p.buyPrice), sell = fmt(p.sellPrice);
+    return `
+      <div style="padding:10px" class="prod-detail">
+        <div class="detail-grid">
+          <div class="detail-item"><strong>Beschreibung:</strong><div class="small">${escapeHtml(p.desc||'—')}</div></div>
+          <div class="detail-item"><strong>Effekt:</strong><div class="small">${escapeHtml(p.effect||'—')}</div></div>
+          <div class="detail-item"><strong>Rarität:</strong><div class="small">${escapeHtml(p.rarity||'Common')}</div></div>
+          <div class="detail-item"><strong>Min. Ruhm:</strong><div class="small">${p.minFame||0}</div></div>
+          <div class="detail-item"><strong>Buy (Händler kauft):</strong><div class="small">${escapeHtml(buy)}</div></div>
+          <div class="detail-item"><strong>Sell (Händler verkauft):</strong><div class="small">${escapeHtml(sell)}</div></div>
+          <div class="detail-item"><strong>Typ:</strong><div class="small">${escapeHtml(p.type||'—')}</div></div>
+          <div class="detail-item"><strong>Produkt-ID:</strong><div class="small">${p.id}</div></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderVendorProducts(vendorId){
+    const tbody = document.querySelector(`tbody[data-tbody="${vendorId}"]`);
+    if(!tbody) return;
+    tbody.innerHTML = '';
+    vendorProducts(vendorId).forEach(p=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${p.id}</td><td class="${p.rarity==='Rare'?'rarity-rare':p.rarity==='Legendary'?'rarity-legendary':''}">${escapeHtml(p.name)}</td><td>${escapeHtml(p.type||'')}</td>
+        <td><input class="stockInp" data-prod="${p.id}" type="number" value="${p.stock||0}" style="width:80px"></td>
+        <td>${fmt(p.sellPrice)}</td><td>${fmt(p.buyPrice)}</td>
+        <td>
+          <button data-toggle-detail="${p.id}">Details ↓</button>
+          <button data-buy="${p.id}">Kaufen</button>
+          <button data-sell="${p.id}">Verkauf</button>
+        </td>`;
+      tbody.appendChild(tr);
+      // detail row
+      const det = document.createElement('tr'); det.className='prod-detail-row'; det.style.display='none';
+      det.innerHTML = `<td colspan="7">${formatProductDetailsHTML(p)}</td>`;
+      tbody.appendChild(det);
+    });
+
+    // handlers: stock change, details toggle, trans buttons
+    tbody.querySelectorAll('.stockInp').forEach(inp => inp.onchange = e => { const id=e.target.dataset.prod; state.products[id].stock = Math.max(0, Math.round(Number(e.target.value)||0)); persist(); renderVendors(); });
+    tbody.querySelectorAll('button[data-toggle-detail]').forEach(btn=>{
+      btn.onclick = (ev)=>{
+        const pid = btn.dataset.toggleDetail;
+        // find next sibling detail row
+        const row = btn.closest('tr');
+        const detailRow = row.nextElementSibling;
+        if(!detailRow || !detailRow.classList.contains('prod-detail-row')) return;
+        const isOpen = detailRow.style.display === 'table-row';
+        // collapse other detail rows in this tbody
+        tbody.querySelectorAll('.prod-detail-row').forEach(r=>r.style.display='none');
+        // toggle
+        detailRow.style.display = isOpen ? 'none' : 'table-row';
+        // update button arrows
+        tbody.querySelectorAll('button[data-toggle-detail]').forEach(b=>b.textContent = 'Details ↓');
+        btn.textContent = isOpen ? 'Details ↓' : 'Details ↑';
+      };
+    });
+    tbody.querySelectorAll('button[data-buy]').forEach(b=>b.onclick = () => openTransactionModal(b.dataset.buy, 'buy'));
+    tbody.querySelectorAll('button[data-sell]').forEach(b=>b.onclick = () => openTransactionModal(b.dataset.sell, 'sell'));
+  }
+
+  function renderVendorLog(vendorId){
+    const logEl = document.getElementById('log-'+vendorId);
+    if(!logEl) return;
+    const arr = state.logs[vendorId] || [];
+    if(arr.length===0){ logEl.textContent='Keine Transaktionen.'; return; }
+    logEl.innerHTML = '';
+    arr.slice().reverse().forEach(it=>{ const d=document.createElement('div'); d.style.marginBottom='8px'; d.innerHTML = `<div style="font-weight:600">${escapeHtml(it.action)}</div><div class="small muted">${escapeHtml(it.time)}</div><div class="small">${escapeHtml(it.details)}</div><div class="small muted">Funds: ${fmt(it.funds)}</div>`; logEl.appendChild(d); });
+  }
+
+  function escapeHtml(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function rebuildGlobalDropdown(){ globalProductList.innerHTML='<option value="">— Produkte —</option>'; Object.values(state.products).sort((a,b)=>a.id.localeCompare(b.id)).forEach(p=>{ const opt=document.createElement('option'); opt.value=p.id; opt.textContent=`${p.id} — ${p.name} (${state.vendors[p.vendorId]?.name||p.vendorId}) ${fmt(p.sellPrice)}`; globalProductList.appendChild(opt); }); }
+
+  // ---------- product modal ----------
+  const pModal = document.getElementById('productModal');
+  let currentProd = null;
+  function openProductModal(id){
+    const p = state.products[id]; if(!p) return alert('Produkt nicht gefunden');
+    currentProd = id;
+    document.getElementById('pModalTitle').textContent = p.name;
+    document.getElementById('pId').textContent = p.id;
+    document.getElementById('pVendor').textContent = state.vendors[p.vendorId]?.name || p.vendorId;
+    document.getElementById('pName').value = p.name;
+    document.getElementById('pDesc').value = p.desc || '';
+    document.getElementById('pEffect').value = p.effect || '';
+    document.getElementById('pRarity').value = p.rarity || 'Common';
+    document.getElementById('pStock').value = p.stock || 0;
+    document.getElementById('pSell').value = `${p.sellPrice?.B||0} ${p.sellPrice?.S||0} ${p.sellPrice?.G||0} ${p.sellPrice?.P||0}`;
+    document.getElementById('pBuy').value = `${p.buyPrice?.B||0} ${p.buyPrice?.S||0} ${p.buyPrice?.G||0} ${p.buyPrice?.P||0}`;
+    document.getElementById('pMinFame').value = p.minFame || 0;
+    showOverlay(true); pModal.style.display='block';
+  }
+  document.getElementById('pClose').onclick = ()=>{ pModal.style.display='none'; showOverlay(false); currentProd=null; };
+  document.getElementById('pSave').onclick = ()=>{
+    if(!currentProd) return;
+    const p = state.products[currentProd];
+    p.name = document.getElementById('pName').value || p.name;
+    p.desc = document.getElementById('pDesc').value;
+    p.effect = document.getElementById('pEffect').value;
+    p.rarity = document.getElementById('pRarity').value;
+    p.stock = Math.max(0, Math.round(Number(document.getElementById('pStock').value)||0));
+    p.sellPrice = parseMoneyStr(document.getElementById('pSell').value);
+    p.buyPrice = parseMoneyStr(document.getElementById('pBuy').value);
+    p.minFame = Math.max(0, Math.round(Number(document.getElementById('pMinFame').value)||0));
+    addLog(p.vendorId, 'Produkt bearbeitet', `ID ${p.id}`);
+    persist(); pModal.style.display='none'; showOverlay(false); currentProd=null; renderVendors();
+  };
+
+  // ---------- transactions ----------
+  const tModal = document.getElementById('transModal');
+  let pendingTrans = null;
+  function openTransactionModal(prodId, mode){
+    const prod = state.products[prodId]; if(!prod) return alert('Produkt nicht gefunden');
+    pendingTrans = { prodId, mode, vendorId: prod.vendorId };
+    document.getElementById('tProd').textContent = prod.name;
+    document.getElementById('tVendor').textContent = state.vendors[prod.vendorId]?.name || prod.vendorId;
+    document.getElementById('tQty').value = 1;
+    document.getElementById('tHaggle').value = 'no';
+    document.getElementById('tHagglePerc').value = 0; document.getElementById('tHagglePerc').disabled = true;
+    computeTransPrice();
+    showOverlay(true); tModal.style.display='block';
+  }
+  document.getElementById('tHaggle').onchange = ()=>{ document.getElementById('tHagglePerc').disabled = (document.getElementById('tHaggle').value !== 'yes'); computeTransPrice(); };
+  document.getElementById('tHagglePerc').oninput = computeTransPrice;
+  document.getElementById('tQty').oninput = computeTransPrice;
+
+  function computeTransPrice(){
+    if(!pendingTrans) return;
+    const p = state.products[pendingTrans.prodId];
+    const qty = Math.round(Number(document.getElementById('tQty').value)||0);
+    const baseBronze = toBronze(p[pendingTrans.mode==='buy' ? 'sellPrice' : 'buyPrice']);
+    const haggle = document.getElementById('tHaggle').value === 'yes' ? Number(document.getElementById('tHagglePerc').value)||0 : 0;
+    const unit = Math.max(1, Math.round(baseBronze * (1 + haggle/100)));
+    const total = Math.abs(qty) * unit;
+    document.getElementById('tPrice').innerHTML = `Pro Einheit: ${fmt(fromBronze(unit))} (Haggle ${haggle}%)<br>Gesamt: ${fmt(fromBronze(total))}`;
+  }
+
+  document.getElementById('transConfirm').onclick = ()=>{
+    if(!pendingTrans) return alert('Keine Transaktion aktiv');
+    const p = state.products[pendingTrans.prodId];
+    const v = state.vendors[pendingTrans.vendorId];
+    const qty = Math.round(Number(document.getElementById('tQty').value)||0);
+    if(qty === 0) return alert('Ungültige Menge');
+    const baseBronze = toBronze(p[pendingTrans.mode==='buy' ? 'sellPrice' : 'buyPrice']);
+    const haggle = document.getElementById('tHaggle').value === 'yes' ? Number(document.getElementById('tHagglePerc').value)||0 : 0;
+    const unit = Math.max(1, Math.round(baseBronze * (1 + haggle/100)));
+    const total = Math.abs(qty) * unit;
+
+    if(pendingTrans.mode === 'buy'){
+      if(p.stock < qty) return alert('Nicht genügend Bestand beim Händler.');
+      const vendorOld = toBronze(v.funds);
+      v.funds = fromBronze(vendorOld + total);
+      p.stock -= qty;
+      addLog(v.id, 'Verkauf', `Spieler kaufte ${qty}×${p.id} @ ${fmt(fromBronze(unit))}`);
+      persist(); alert('Kauf abgeschlossen');
+    } else {
+      const vendorFunds = toBronze(v.funds);
+      if(vendorFunds < total) return alert('Händler hat nicht genug Geld.');
+      v.funds = fromBronze(vendorFunds - total);
+      p.stock += qty;
+      addLog(v.id, 'Ankauf', `Händler kaufte ${qty}×${p.id} @ ${fmt(fromBronze(unit))}`);
+      persist(); alert('Verkauf abgeschlossen');
+    }
+    pendingTrans = null; tModal.style.display='none'; showOverlay(false); renderVendors();
+  };
+  document.getElementById('transCancel').onclick = ()=>{ pendingTrans=null; tModal.style.display='none'; showOverlay(false); };
+
+  // ---------- Manager ----------
+  const managerModal = document.getElementById('managerModal');
+  function openManager(){ refreshManagerUI(); showOverlay(true); managerModal.style.display='block'; }
+  document.getElementById('btnManager').onclick = openManager;
+  document.getElementById('mClose').onclick = ()=>{ managerModal.style.display='none'; showOverlay(false); };
+
+  function refreshManagerUI(){
+    const vlist = document.getElementById('mVendorList'); vlist.innerHTML='';
+    Object.values(state.vendors).forEach(v=>{ const el=document.createElement('div'); el.style.display='flex'; el.style.justifyContent='space-between'; el.style.padding='6px'; el.innerHTML=`<div><b>${escapeHtml(v.name)}</b><div class="small muted">${escapeHtml(v.desc)}</div></div><div><button data-delv="${v.id}">Entf.</button></div>`; vlist.appendChild(el); });
+    const plist = document.getElementById('mProdList'); plist.innerHTML='';
+    Object.values(state.products).forEach(p=>{
+      const outer = document.createElement('div'); outer.style.padding='6px'; outer.style.borderBottom='1px solid rgba(255,255,255,0.02)';
+      outer.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div>${p.id} • ${escapeHtml(p.name)} <span class="${p.rarity==='Rare'?'rarity-rare':p.rarity==='Legendary'?'rarity-legendary':''}">(${p.rarity})</span></div><div><button data-delp="${p.id}">Entf.</button> <button data-toggle-manager-detail="${p.id}">Details ↓</button></div></div><div class="manager-prod-detail" data-manager-detail="${p.id}" style="display:none;margin-top:8px">${formatProductDetailsHTML(p)}</div>`;
+      plist.appendChild(outer);
+    });
+    const vendorSel = document.getElementById('mProdVendor'); vendorSel.innerHTML='';
+    Object.values(state.vendors).forEach(v=>{ const o=document.createElement('option'); o.value=v.id; o.textContent=v.name; vendorSel.appendChild(o); });
+  }
+
+  // manager add vendor/product
+  document.getElementById('mAddVendor').addEventListener('click', ()=>{ const n=document.getElementById('mVendorName').value.trim(); const d=document.getElementById('mVendorDesc').value.trim(); if(!n) return alert('Name nötig'); const id=nid(n); if(state.vendors[id]) return alert('Händler-ID existiert'); state.vendors[id]={id,name:n,desc:d,funds:{B:0,S:0,G:0,P:0}}; state.logs[id]=[]; persist(); refreshManagerUI(); renderVendors(); alert('Händler erstellt'); });
+
+  document.getElementById('mAddProd').addEventListener('click', ()=>{ const name=document.getElementById('mProdName').value.trim(); const vendorId=document.getElementById('mProdVendor').value; if(!name||!vendorId) return alert('Name & Händler nötig'); const type=document.getElementById('mProdType').value.trim()||'Allg'; const rarity=document.getElementById('mProdRarity').value; const sell=parseMoneyStr(document.getElementById('mProdSell').value); const buy=parseMoneyStr(document.getElementById('mProdBuy').value); const stock=Math.max(0,Math.round(Number(document.getElementById('mProdStock').value)||1)); const desc=document.getElementById('mProdDesc').value||''; const effect=document.getElementById('mProdEffect').value||''; const id=(name.split(' ').map(w=>w[0]||'').join('').slice(0,3).toUpperCase() + '-' + Math.random().toString(36).slice(2,5).toUpperCase()); state.products[id]={id,name,type,vendorId,rarity,minFame:0,desc,effect,buyPrice:buy,sellPrice:sell,stock}; addLog(vendorId,'Produkt erstellt',`ID ${id}`); persist(); refreshManagerUI(); renderVendors(); alert('Produkt erstellt'); });
+
+  // delegated clicks in manager lists
+  document.getElementById('mVendorList').addEventListener('click', e=>{ if(e.target.dataset.delv){ if(confirm('Händler entfernen?')){ delete state.vendors[e.target.dataset.delv]; delete state.logs[e.target.dataset.delv]; persist(); refreshManagerUI(); renderVendors(); } }});
+  document.getElementById('mProdList').addEventListener('click', e=>{
+    if(e.target.dataset.delp){ if(confirm('Produkt entfernen?')){ delete state.products[e.target.dataset.delp]; persist(); refreshManagerUI(); renderVendors(); } }
+    if(e.target.dataset.toggleManagerDetail){
+      const pid = e.target.dataset.toggleManagerDetail;
+      const detailEl = document.querySelector(`[data-manager-detail="${pid}"]`);
+      if(!detailEl) return;
+      const isOpen = detailEl.style.display === 'block';
+      document.querySelectorAll('.manager-prod-detail').forEach(d=>d.style.display='none');
+      document.querySelectorAll('[data-toggle-manager-detail]').forEach(b=>b.textContent='Details ↓');
+      detailEl.style.display = isOpen ? 'none' : 'block';
+      e.target.textContent = isOpen ? 'Details ↓' : 'Details ↑';
+    }
+  });
+
+  // delegated event handlers for vendor controls and product buttons
+  document.addEventListener('click', e=>{
+    if(e.target && e.target.dataset && e.target.dataset.setfund){
+      const vid = e.target.dataset.setfund;
+      const inputs = document.querySelectorAll(`input[data-vfund][data-vendor="${vid}"]`);
+      const f = {B:0,S:0,G:0,P:0}; inputs.forEach(inp=>{ f[inp.dataset.vfund] = Math.max(0, Math.round(Number(inp.value)||0)); });
+      state.vendors[vid].funds = f; addLog(vid,'Funds gesetzt','Manager'); persist(); renderVendors();
+    }
+    if(e.target && e.target.dataset && e.target.dataset.discount){
+      const vid = e.target.dataset.discount; const pct = Number(prompt('Rabatt % (z.B. 10)')); if(isNaN(pct)) return alert('Ungültig'); applyVendorDiscount(vid,pct); renderVendors();
+    }
+    // vendor-level delegated product actions handled in renderVendorProducts via handlers (buttons)
+  });
+
+  // backup export/import
+  document.getElementById('mExport').addEventListener('click', ()=>{ try{ const blob = new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='dorf_backup.json'; a.click(); URL.revokeObjectURL(url); }catch(e){ alert('Export fehlgeschlagen'); console.error(e); } });
+  document.getElementById('mImport').addEventListener('click', ()=> document.getElementById('mImportFile').click());
+  document.getElementById('mImportFile').addEventListener('change', ev=>{ const file = ev.target.files[0]; if(!file) return; const r=new FileReader(); r.onload = e=>{ try{ const data = JSON.parse(e.target.result); if(!data.vendors || !data.products) return alert('Ungültiges Backup'); state = data; state.logs = state.logs || {}; Object.keys(state.vendors).forEach(id=>{ if(!state.logs[id]) state.logs[id]=[]; }); persist(); refreshManagerUI(); renderVendors(); alert('Import OK'); }catch(err){ alert('Import Fehler'); console.error(err); } }; r.readAsText(file); });
+
+  // apply discounts
+  function applyVendorDiscount(vendorId,pct){ Object.values(state.products).filter(p=>p.vendorId===vendorId).forEach(p=>{ ['sellPrice','buyPrice'].forEach(k=>{ const b=toBronze(p[k]); p[k] = fromBronze(Math.max(1, Math.round(b*(1 - pct/100)))); }); }); addLog(vendorId,'Rabatt',pct+'%'); persist(); }
+
+  document.getElementById('mApplySale').addEventListener('click', ()=>{ const pct = Math.max(0, Number(document.getElementById('mSalePct').value)||0); if(!confirm(`Global Sale ${pct}% anwenden?`)) return; Object.values(state.products).forEach(p=>{ ['sellPrice','buyPrice'].forEach(k=>{ const b=toBronze(p[k]); p[k]=fromBronze(Math.max(1, Math.round(b*(1-pct/100)))); }); }); Object.keys(state.vendors).forEach(id=>addLog(id,'Global Sale',pct+'%')); persist(); renderVendors(); alert('Global Sale angewendet'); });
+
+  // weekly sim
+  document.getElementById('weekBtn').addEventListener('click', ()=>{ const strength = Number(document.getElementById('weekStrength').value)/100; Object.values(state.products).forEach(p=>{ const rFactor = p.rarity==='Legendary'?0.08: p.rarity==='Rare'?0.36:1; const ch = Math.round(p.stock * ((Math.random()*2-1) * strength * rFactor)); p.stock = Math.max(0, p.stock + ch); }); Object.keys(state.vendors).forEach(id=>addLog(id,'Wochenupdate','Bestand geändert')); persist(); renderVendors(); alert('Woche simuliert'); });
+
+  // search suggestions
+  globalSearch.addEventListener('input', ()=>{
+    const q = globalSearch.value.trim().toLowerCase();
+    if(!q){ suggestBox.style.display='none'; return; }
+    const results=[];
+    Object.values(state.products).forEach(p=>{ if(p.id.toLowerCase().includes(q) || p.name.toLowerCase().includes(q)) results.push({type:'p', label:`${p.id} ${p.name}`, id:p.id}); });
+    Object.values(state.vendors).forEach(v=>{ if(v.name.toLowerCase().includes(q)) results.push({type:'v', label:`Vendor: ${v.name}`, id:v.id}); });
+    suggestBox.innerHTML=''; results.slice(0,50).forEach(r=>{ const d=document.createElement('div'); d.style.padding='6px'; d.style.cursor='pointer'; d.style.borderBottom='1px solid rgba(255,255,255,0.02)'; d.textContent=r.label; d.onclick=()=>{ suggestBox.style.display='none'; globalSearch.value=''; if(r.type==='p') openProductModal(r.id); else { document.querySelectorAll('.vendorHeader').forEach(h=>{ if(h.textContent.includes(state.vendors[r.id].name)) h.click(); }); } }; suggestBox.appendChild(d); }); suggestBox.style.display = results.length ? 'block' : 'none';
+  });
+
+  // global dropdown
+  function rebuildGlobalDropdown(){ globalProductList.innerHTML = '<option value="">— Produkte —</option>'; Object.values(state.products).sort((a,b)=>a.id.localeCompare(b.id)).forEach(p=>{ const opt=document.createElement('option'); opt.value=p.id; opt.textContent=`${p.id} — ${p.name} (${state.vendors[p.vendorId]?.name||p.vendorId}) ${fmt(p.sellPrice)}`; globalProductList.appendChild(opt); }); }
+  globalProductList.addEventListener('change', ()=>{ const pid = globalProductList.value; if(pid) openProductModal(pid); });
+
+  // utility
+  function showOverlay(on){ document.getElementById('overlay').style.display = on ? 'block' : 'none'; }
+
+  // close modal on overlay click
+  document.getElementById('overlay').addEventListener('click', ()=>{ document.querySelectorAll('.modal').forEach(m=>m.style.display='none'); showOverlay(false); });
+
+  // initial load & render
+  load();
+  renderVendors();
+  rebuildGlobalDropdown();
+
+  // console helper
+  window.DorfHandel = { state, persist, seedDefaults: seedDefaults, load };
+
+  // ensure product modal save/close bound
+  // (pSave/pClose already defined earlier)
+  // bind pClose/pSave exist
+  document.getElementById('pClose').addEventListener('click', ()=>{ document.getElementById('productModal').style.display='none'; showOverlay(false); currentProd=null; });
+  document.getElementById('pSave').addEventListener('click', ()=>{ document.getElementById('pSave').click(); }); // the pSave click handled earlier via id
+
+  // small compatibility safety: if some handlers not wired, rebind a safe listener
+  // (no-op; UI should already work)
+
+})();
+</script>
 </body>
 </html>
